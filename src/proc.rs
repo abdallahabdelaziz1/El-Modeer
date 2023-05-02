@@ -1,9 +1,9 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::{error::Error, io, thread::sleep, time::Duration};
+use std::{error::Error, io, thread, time::Duration};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Layout},
@@ -12,27 +12,31 @@ use tui::{
     Frame, Terminal,
 };
 use procfs::process;
+use crossbeam_channel::{select, tick, unbounded, Receiver};
+use num_rational::Ratio;
+
 
 struct App {
     state: TableState,
-    items: Vec<Vec< String>>,
+    items: Vec<Vec<String>>,
 }
 
 impl App {
     fn new(tablestate : Option<TableState>) -> App {
         let tps = procfs::ticks_per_second();
         let mut vec = Vec::new();
+
         for prc in process::all_processes().unwrap() {
             let prc = prc.unwrap();
             let stat = prc.stat().unwrap();
             // total_time is in seconds
+            let pid = stat.pid;
             let total_time = (stat.utime + stat.stime) as f32 / (tps as f32);
+            let tty = format!("pts/{}", stat.tty_nr().1);
+
             if stat.tty_nr().1 != 0{
-                vec.push(vec![stat.pid.to_string(), stat.tty_nr().1.to_string(), total_time.to_string(), stat.comm])
+                vec.push(vec![pid.to_string(), tty.to_string(), total_time.to_string(), stat.comm])
             }
-            
-        //    let in_vec = [stat.pid, stat.tty_nr().1, total_time, stat.comm].iter().map(|item| item.to_string()).collect::<Vec<_>>();
-        //     vec.push(in_vec);
         }
         App {
             state: tablestate.unwrap_or(TableState::default()),
@@ -43,7 +47,7 @@ impl App {
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
-                    0
+                    self.items.len() - 1
                 } else {
                     i + 1
                 }
@@ -57,7 +61,7 @@ impl App {
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
-                    self.items.len() - 1
+                    0
                 } else {
                     i - 1
                 }
@@ -68,6 +72,26 @@ impl App {
     }
 }
 
+fn setup_ui_events() -> Receiver<Event> {
+	let (sender, receiver) = unbounded();
+	thread::spawn(move || loop {
+		sender.send(crossterm::event::read().unwrap()).unwrap();
+	});
+
+	receiver
+}
+
+fn setup_ctrl_c() -> Receiver<()> {
+	let (sender, receiver) = unbounded();
+	ctrlc::set_handler(move || {
+		sender.send(()).unwrap();
+	})
+	.unwrap();
+
+	receiver
+}
+
+
 pub fn proc() -> Result<(), Box<dyn Error>> {
     // setup terminal
     enable_raw_mode()?;
@@ -77,34 +101,53 @@ pub fn proc() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
 
 
-    let draw_interval = Duration::from_millis(100);
-    let mut last_draw_time = std::time::Instant::now();
+    let draw_interval = Ratio::from_integer(1);
+    let ticker = tick(Duration::from_secs_f64(
+		*draw_interval.numer() as f64 / *draw_interval.denom() as f64,
+	));
+
+    
     let mut app = App::new(None);
+    let ctrl_c_events = setup_ctrl_c();
+    let ui_events_receiver = setup_ui_events();
     terminal.draw(|f| ui(f, &mut app))?;
 
-    loop{
-        if std::time::Instant::now() - last_draw_time >= draw_interval {
-            terminal.clear()?;
-            app = App::new(Some(app.state));
-            terminal.draw(|f| ui(f, &mut app))?;
-            last_draw_time = std::time::Instant::now();
-        }
-
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Down => app.next(),
-                KeyCode::Up => app.previous(),
-                _ => {}
+    loop {
+        select!{
+            recv(ctrl_c_events) -> _ => {
+				break;
+			}
+            recv(ticker) -> _ => {
+                terminal.clear()?;
+                app = App::new(Some(app.state));
+                terminal.draw(|f| ui(f, &mut app))?;
             }
+            recv(ui_events_receiver) -> message => {
+                match message.unwrap(){
+                    Event::Key(key_event) => {
+						if key_event.modifiers.is_empty() {
+                            match key_event.code{
+                                KeyCode::Char('q') => break, 
+                                KeyCode::Down => app.next(),
+                                KeyCode::Up => app.previous(),
+                                _ => {}
+                            }
+                        }else if key_event.modifiers == KeyModifiers::CONTROL {
+							match key_event.code {
+								KeyCode::Char('c') => {
+									break
+								},
+                                _ => {}
+                            }
+                        }
+
+                    },
+                    _ => {}
+                }
+            }
+
         }
-
-     
-
     }
-    // create app and run it
-    // let app = App::new();
-    // let res = run_app(&mut terminal, app);
 
     // restore terminal
     disable_raw_mode()?;
@@ -122,20 +165,6 @@ pub fn proc() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
-    loop {
-        terminal.draw(|f| ui(f, &mut app))?;
-
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char('q') => return Ok(()),
-                KeyCode::Down => app.next(),
-                KeyCode::Up => app.previous(),
-                _ => {}
-            }
-        }
-    }
-}
 
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let rects = Layout::default()
