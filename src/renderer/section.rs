@@ -13,20 +13,22 @@ use std::fmt;
 
 #[derive(FromPrimitive, PartialEq, Copy, Clone, Debug, Ord, PartialOrd, Eq)]
 pub enum Section {
-    Cpu = 0,
-    Network = 1,
-    Disk = 2,
-    Graphics = 3,
-    Process = 4,
+    // Cpu = 0,
+    // Network = 1,
+    // Disk = 2,
+    // Graphics = 3,
+    SystemInfo = 0,
+    Process = 1,
 }
 
 impl fmt::Display for Section {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let name = match self {
-            Section::Cpu => " CPU",
-            Section::Disk => " Disk",
-            Section::Graphics => " Graphics",
-            Section::Network => " Network",
+            // Section::Cpu => " CPU",
+            // Section::Disk => " Disk",
+            // Section::Graphics => " Graphics",
+            // Section::Network => " Network",
+            Section::SystemInfo => " System Info",
             Section::Process => " Process",
         };
         write!(f, "{}", name)
@@ -59,7 +61,7 @@ impl<'a> SectionMGRList<'a> {
         debug!("Section Set: {:?}", section_set.len());
         debug!("Section Set: {:?}", section_set);
         let mut state = ListState::default();
-        let items: Vec<(Section, ListItem)> = [0, 1, 2, 3, 4]
+        let items: Vec<(Section, ListItem)> = [0, 1]
             .iter()
             .map(|i| {
                 let section: Section = FromPrimitive::from_u32(*i as u32)

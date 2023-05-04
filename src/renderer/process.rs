@@ -303,7 +303,7 @@ pub fn render_process(
         run_duration.num_seconds() % 60
     );
 
-    let rhs_style = Style::default().fg(Color::Green);
+    let rhs_style = Style::default().fg(Color::Blue);
     let mut text = vec![
         Spans::from(vec![
             Span::raw("Name:                  "),
