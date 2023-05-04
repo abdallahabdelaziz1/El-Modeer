@@ -261,7 +261,7 @@ pub fn render_process_table(
     if freeze{
         Paragraph::new(frozen_text)
         .block(Block::default())
-        .render(f, Rect::new(1, area.height.saturating_sub(1), 12, 1));
+        .render(f, Rect::new(1, f.size().height.saturating_sub(2), 12, 1));
     }
 
 
@@ -501,7 +501,7 @@ pub fn render_process(
     if freeze{
         Paragraph::new(frozen_text)
         .block(Block::default())
-        .render(f, Rect::new(1, layout.height.saturating_sub(1), 12, 1));
+        .render(f, Rect::new(1, f.size().height.saturating_sub(2), 12, 1));
     }
 }
 
