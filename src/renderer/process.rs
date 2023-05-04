@@ -25,7 +25,10 @@ pub fn render_process_table(
     border_style: Style,
     show_paths: bool,
     show_find: bool,
+    show_kill: bool,
     filter: &str,
+    kill_pid: &str,
+    process_table_message: &String,
     highlighted_row: usize,
 ) -> Option<Box<ZProcess>> {
     // 4 for the margins and table header
@@ -230,9 +233,11 @@ pub fn render_process_table(
         format!("[ESC] Clear, Find: {:}", filter)
     } else if !filter.is_empty() {
         format!("Filtered Results: {:}, [/] to change/clear", filter)
+    } else if show_kill {
+        format!("[ESC] Clear, PID to kill: {:}{}", kill_pid, process_table_message)
     } else {
         format!(
-            "Tasks [{:}] Threads [{:}]  Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/]",
+            "Tasks [{:}] Threads [{:}]  Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k]",
             app.processes.len(),
             app.threads_total
         )

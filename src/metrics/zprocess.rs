@@ -20,26 +20,7 @@ use sysinfo::ProcessStatus;
 use chrono::prelude::DateTime;
 use chrono::Duration as CDuration;
 use chrono::Local;
-
-macro_rules! convert_result_to_string {
-    ($x:expr) => {
-        match $x {
-            Ok(_r) => String::from("Signal Sent."),
-            Err(e) => convert_error_to_string!(e),
-        }
-    };
-}
-
-macro_rules! convert_error_to_string {
-    ($x:expr) => {
-        match $x {
-            ProcessError::NoSuchProcess { .. } => String::from("No Such Process"),
-            ProcessError::ZombieProcess { .. } => String::from("Zombie Process"),
-            ProcessError::AccessDenied { .. } => String::from("Access Denied"),
-            _ => String::from("Unknown error"),
-        }
-    };
-}
+use crate::{convert_result_to_string, convert_error_to_string};
 
 #[derive(Clone)]
 pub struct ZProcess {
