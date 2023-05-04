@@ -15,11 +15,34 @@ use tui::{
     Frame, Terminal,
 };
 
-use procfs::process;
+
 use crossbeam_channel::{select, tick, unbounded, Receiver};
 use num_rational::Ratio;
-use sysinfo::{CpuExt, System, SystemExt};
+use sysinfo::{CpuExt, System, SystemExt, Process, ProcessExt, UserExt, ProcessStatus};
+use users::{Users, UsersCache};
 const TO_GB: f64 = 1024_f64 * 1024_f64 * 1024_f64;
+
+
+
+fn status_to_single_char(status: ProcessStatus) -> String {
+    let s = match status {
+        ProcessStatus::Idle => "I",
+        ProcessStatus::Run => "R",
+        ProcessStatus::Sleep => "S",
+        ProcessStatus::Stop => "T",
+        ProcessStatus::Zombie => "Z",
+        ProcessStatus::Tracing => "t",
+        ProcessStatus::Dead => "x",
+        ProcessStatus::Wakekill => "K",
+        ProcessStatus::Waking => "W",
+        ProcessStatus::Parked => "P",
+        ProcessStatus::Unknown(_) => "U",
+        _ => "U"
+    };
+
+    s.to_string()
+}
+
 
 
 struct App {
@@ -28,22 +51,86 @@ struct App {
 }
 
 impl App {
-    fn new(tablestate: Option<TableState>) -> App {
+    fn new(tablestate: Option<TableState>, sys: &mut System) -> App {
         let tps = procfs::ticks_per_second();
         let mut vec = Vec::new();
 
-        for prc in process::all_processes().unwrap() {
-            let prc = prc.unwrap();
-            let stat = prc.stat().unwrap();
-            // total_time is in seconds
-            let pid = stat.pid;
-            let total_time = (stat.utime + stat.stime) as f32 / (tps as f32);
-            let tty = format!("pts/{}", stat.tty_nr().1);
+        let process_list = sys.processes();
 
-            if stat.tty_nr().1 != 0{
-                vec.push(vec![pid.to_string(), tty.to_string(), total_time.to_string(), stat.comm])
+
+        for (pid, process) in process_list {
+                        
+            //  User
+            // PID
+            // PPID (Parent PID)
+            // TTY
+            /// CPU utilization
+            // CPU time
+            // CMD (Command)
+            // Start time => Neglect
+            // Priority (nice value)
+            // Background or foreground => Neglect
+            // Category (sleeping, running, zombie, stopped) 
+
+           let mut user_name = String::from("Not Known");
+           if let Some(user_id) = process.user_id() {
+                user_name = match sys.get_user_by_id(user_id) {
+                           Some(s) => s.name().to_string(),
+                           None => String::from("Not Known")
+                }
+        
             }
+            //let ppid = process.parent().unwrap().to_string();
+
+            let pid_i32 :i32 = pid.to_string().parse().unwrap();
+            
+
+            let fproc = match procfs::process::Process::new(pid_i32) {
+                    Ok((p)) =>  p,
+                    Err(error) => continue,
+            };
+
+           // let fproc = procfs::process::Process::new(pid_i32).unwrap_or_else(|| None);
+            let stat = fproc.stat().unwrap();
+            let tty = format!("pts/{}", stat.tty_nr().1).to_string(); //TODO(Adjust tty)
+
+            let cpu_usage  = process.cpu_usage().to_string();
+
+            let total_time = (stat.utime + stat.stime) as f32 / (tps as f32);
+
+            //let cmd = (*process.cmd())[0].to_string();
+
+            let cmd = process.cmd().join("");
+
+            let priority = stat.nice.to_string();
+
+            let status = status_to_single_char(process.status());
+           
+            let ppid = stat.ppid.to_string();
+
+
+
+            vec.push(vec![pid.to_string(), user_name, ppid, tty, cpu_usage, total_time.to_string(),
+                cmd, priority, status
+            ])
+                        
+
+
         }
+
+        // for prc in procfs::process::all_processes().unwrap() {
+        //     let prc = prc.unwrap();
+        //     let stat = prc.stat().unwrap();
+        //     // total_time is in seconds
+        //     let pid = stat.pid;
+        //     let total_time = (stat.utime + stat.stime) as f32 / (tps as f32);
+        //     let tty = format!("pts/{}", stat.tty_nr().1); //TODO(Adjust tty)
+
+
+
+        //     vec.push(vec![pid.to_string(), tty.to_string(), total_time.to_string(), stat.comm])
+            
+        // }
         App {
             state: tablestate.unwrap_or(TableState::default()),
             items: vec,
@@ -114,10 +201,12 @@ pub fn proc() -> Result<(), Box<dyn Error>> {
 
     
 
-    let mut app = App::new(None);
     // Create a sys (System object) to be accessible from everywhere
     let mut sys: System = System::new();
     sys.refresh_all(); // First we update all information of our `System` struct.
+    let mut app = App::new(None, &mut sys);
+    sys.processes();
+  
 
     let ctrl_c_events = setup_ctrl_c();
     let ui_events_receiver = setup_ui_events();
@@ -130,7 +219,7 @@ pub fn proc() -> Result<(), Box<dyn Error>> {
 			}
             recv(ticker) -> _ => {
                 terminal.clear()?;
-                app = App::new(Some(app.state));
+                app = App::new(Some(app.state), &mut sys);
                 terminal.draw(|f| ui(f, &mut app, &mut sys))?;
             }
             recv(ui_events_receiver) -> message => {
@@ -186,7 +275,7 @@ fn get_sys_widget<'a>(sys: &mut System) -> Paragraph<'a> {
     let mut stopped = 0;
     let mut zombie = 0;
 
-    for proc in process::all_processes().unwrap() {
+    for proc in procfs::process::all_processes().unwrap() {
         total += 1;
         let proc = proc.unwrap();
         match proc.stat().unwrap().state {
@@ -261,8 +350,12 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App, sys: &mut System) {
         .constraints([Constraint::Min(6), Constraint::Percentage(100)].as_ref())
         .margin(0)
         .split(f.size());
+///   vec.push(vec![pid.to_string(), user_name, ppid, tty, cpu_usage, total_time.to_string(),
+// cmd, priority, status
+// ])
 
-    let header_cells = ["PID", "TTY", "TIME", "CMD"]
+
+    let header_cells = ["PID", "USER", "PPID", "TTY", "CPU%", "TIME", "CMD", "Priority", "Status"]
         .iter()
         .map(|h| Cell::from(*h).style(*BLACK));
     let header = Row::new(header_cells)
@@ -280,12 +373,15 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App, sys: &mut System) {
         Row::new(cells).height(height as u16).bottom_margin(0)
     });
     let n: u32 = app.items[0].len() as u32;
-    let widths = [
-        Constraint::Ratio(1, n),
-        Constraint::Ratio(1, n),
-        Constraint::Ratio(1, n),
-        Constraint::Ratio(1, n),
-    ];
+    
+    //[1u32; n];
+    let widths = [Constraint::Ratio(1, n); 9];
+    // let widths = [
+    //     Constraint::Ratio(1, n),
+    //     Constraint::Ratio(1, n),
+    //     Constraint::Ratio(1, n),
+    //     Constraint::Ratio(1, n),
+    // ];
 
     let t = Table::new(rows)
         .header(header)
