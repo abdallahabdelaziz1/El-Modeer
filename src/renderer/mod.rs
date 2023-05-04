@@ -9,6 +9,7 @@ pub mod macros;
 mod network;
 mod process;
 pub mod section;
+pub mod column;
 pub mod style;
 mod title;
 // use crate::metrics::graphics::device::GraphicsExt;
@@ -16,6 +17,7 @@ mod title;
 use crate::metrics::zprocess::*;
 use crate::metrics::*;
 use crate::renderer::section::{sum_section_heights, Section, SectionMGRList};
+use crate::renderer::column::{Column, ColumnMGRList};
 use crate::util::*;
 use crossterm::{
     event::{KeyCode as Key, KeyEvent, KeyModifiers},
@@ -205,6 +207,7 @@ pub struct TerminalRenderer<'a> {
     /// "order" will have is the sequence in which the TAB key will shift focus
     /// among the sections.
     section_geometry: Vec<(Section, f64)>,
+    proc_columns: Vec<Column>,
     zoom_factor: u32,
     update_number: u32,
     // hist_start_offset: usize,
@@ -215,10 +218,12 @@ pub struct TerminalRenderer<'a> {
     show_paths: bool,
     show_find: bool,
     show_section_mgr: bool,
+    show_column_mgr: bool,
     filter: String,
     highlighted_row: usize,
     selection_grace_start: Option<Instant>,
     section_manager_options: SectionMGRList<'a>,
+    column_manager_options: ColumnMGRList<'a>,
     // disable_history: bool,
     recompute_constraints_on_start_up: bool,
 }
@@ -248,11 +253,22 @@ impl<'a> TerminalRenderer<'_> {
         let constraints = get_constraints(section_geometry, terminal_size().1);
         let mut section_geometry = section_geometry.to_vec();
         let mut recompute_constraints_on_start_up = false;
+        let default_cols = vec![
+            Column::PID, 
+            Column::PPID, 
+            Column::TTY, 
+            Column::Status, 
+            Column::User, 
+            Column::CPUTime, 
+            Column::StartTime
+        ];
+
         // app.update_gfx_devices();
         // if app.gfx_devices.is_empty() {
         //     section_geometry.retain(|(section, _)| *section != Section::Graphics);
         //     recompute_constraints_on_start_up = true;
         // }
+
         TerminalRenderer {
             terminal,
             app,
@@ -262,6 +278,7 @@ impl<'a> TerminalRenderer<'_> {
             // file_system_index: 0,
             // file_system_display: FileSystemDisplay::Activity,
             section_geometry: section_geometry.clone(),
+            proc_columns: default_cols.clone(),
             zoom_factor: 1,
             update_number: 0,
             // select the last section by default (normally should be Process)
@@ -273,10 +290,12 @@ impl<'a> TerminalRenderer<'_> {
             show_paths: false,
             show_find: false,
             show_section_mgr: false,
+            show_column_mgr: false,
             filter: String::from(""),
             highlighted_row: 0,
             selection_grace_start: None,
             section_manager_options: SectionMGRList::with_geometry(section_geometry),
+            column_manager_options: ColumnMGRList::with_cols(default_cols),
             // disable_history,
             recompute_constraints_on_start_up,
         }
@@ -342,12 +361,14 @@ impl<'a> TerminalRenderer<'_> {
             let constraints = &self.constraints;
             let geometry = &self.section_geometry.to_vec();
             let section_manager_options = &mut self.section_manager_options;
+            let column_manager_options = &mut self.column_manager_options;
             let selected = self.section_geometry[self.selected_section_index].0;
             let process_message = &self.process_message;
             // let offset = &self.hist_start_offset;
             let un = &self.update_number;
             let show_help = self.show_help;
             let show_section_mgr = self.show_section_mgr;
+            let show_column_mgr = self.show_column_mgr;
             let show_paths = self.show_paths;
             let filter = &self.filter;
             let show_find = self.show_find;
@@ -387,6 +408,13 @@ impl<'a> TerminalRenderer<'_> {
                             .split(f.size());
                         // title::render_top_title_bar(app, v_sections[0], f, zf, &0);
                         section::render_section_mgr(section_manager_options, v_sections[1], f);
+                    } else if show_column_mgr {
+                        let v_columns = Layout::default()
+                            .direction(Direction::Vertical)
+                            .margin(0)
+                            .constraints([Constraint::Length(1), Constraint::Length(40)].as_ref())
+                            .split(f.size());
+                        column::render_column_mgr(column_manager_options, v_columns[1], f);
                     } else {
                         // create layouts
                         // primary vertical
@@ -605,6 +633,17 @@ impl<'a> TerminalRenderer<'_> {
         //     if self.file_system_index > 0 {
         //         self.file_system_index -= 1;
         //     }
+        } else if self.show_column_mgr {
+            match self.column_manager_options.state.selected() {
+                Some(i) => {
+                    let mut idx = 0;
+                    if (i as i32 - delta as i32) > 0 {
+                        idx = i - delta;
+                    }
+                    self.column_manager_options.state.select(Some(idx));
+                }
+                None => self.section_manager_options.state.select(Some(0)),
+            }
         } else if selected == Section::Process {
             if self.app.selected_process.is_some() || process_table.is_empty() {
                 return;
@@ -644,6 +683,17 @@ impl<'a> TerminalRenderer<'_> {
         //     if self.file_system_index < self.app.disks.len() - 1 {
         //         self.file_system_index += 1;
         //     }
+        } else if self.show_column_mgr {
+            match self.column_manager_options.state.selected() {
+                Some(i) => {
+                    let mut idx = self.column_manager_options.items.len() -1;
+                    if i + delta < idx {
+                        idx = i + delta;
+                    }
+                    self.column_manager_options.state.select(Some(idx));
+                }
+                None => self.column_manager_options.state.select(Some(0)),
+            }
         } else if selected == Section::Process {
             if self.app.selected_process.is_some() || process_table.is_empty() {
                 return;
@@ -714,15 +764,27 @@ impl<'a> TerminalRenderer<'_> {
         self.constraints = get_constraints(self.section_geometry.as_slice(), terminal_size().1);
     }
 
+    fn update_columns(&mut self) {
+        // TODO: Update index to 0, the only one guaranteed to exist
+        let new_proc_cols = self.proc_columns.clone();
+        let selected = self.column_manager_options.state.selected();
+        self.column_manager_options = ColumnMGRList::with_cols(new_proc_cols);
+        self.column_manager_options.state.select(selected);
+        // TODO: This reflects change in the menu but not in proc table
+    }
+
     fn toggle_section(&mut self) {
         if self.show_section_mgr {
             if let Some(s) = self.section_manager_options.selected() {
+                // The section is there and needs to be removed but at least one section should remain
                 if self.section_geometry.len() > 1
                     && self.section_geometry.iter().any(|(gs, _)| *gs == s)
                 {
                     self.section_geometry.retain(|(section, _)| *section != s);
                     self.recompute_constraints();
-                } else if !self.section_geometry.iter().any(|(gs, _)| *gs == s) {
+                } 
+                // The section is not there and needs to be added
+                else if !self.section_geometry.iter().any(|(gs, _)| *gs == s) {
                     let idx = 0;
                     self.section_geometry.insert(idx, (s, 1.0));
                     self.section_geometry
@@ -735,10 +797,48 @@ impl<'a> TerminalRenderer<'_> {
                 }
             }
         }
+        // TODO: Check how will this affect Process Table
+        if self.show_column_mgr {
+            if let Some(c) = self.column_manager_options.selected() {
+                if self.proc_columns.len() > 1
+                        && self.proc_columns.iter().any(|gc| *gc == c)
+                {
+                    self.proc_columns.retain(|section| *section != c);
+                    self.update_columns();
+                } else if !self.proc_columns.iter().any(|gc| *gc == c) {
+                    let idx = 0;
+                    self.proc_columns.insert(idx, c);
+                    self.proc_columns.sort();
+                    self.update_columns();
+                }
+            }
+        }
+            // self.update_columns();
+            // highlighted_process = process::render_process_table(
+            //     app,
+            //     &process_table,
+            //     v_section,
+            //     *pst,
+            //     f,
+            //     border_style,
+            //     show_paths,
+            //     show_find,
+            //     filter,
+            //     highlighted_row,
+            // );
+            // if v_section.height > 4 {
+            //     // account for table border & margins.
+            //     process_table_height = v_section.height - 5;
+            // }
     }
+    
 
     fn toggle_section_mgr(&mut self) {
         self.show_section_mgr = !self.show_section_mgr;
+    }
+
+    fn toggle_column_mgr(&mut self) {
+        self.show_column_mgr = !self.show_column_mgr;
     }
 
     async fn process_toplevel_input(&mut self, input: KeyEvent) -> Action {
@@ -839,6 +939,9 @@ impl<'a> TerminalRenderer<'_> {
             }
             Key::Char(' ') => {
                 self.toggle_section();
+            }
+            Key::Char('o') => {
+                self.toggle_column_mgr();
             }
             Key::F(1) | Key::Char('i') => {
                 self.toggle_section_mgr();

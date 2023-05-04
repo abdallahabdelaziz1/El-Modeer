@@ -48,16 +48,16 @@ pub struct SectionMGRList<'a> {
 
 impl<'a> SectionMGRList<'a> {
     pub fn with_geometry(geometry: Vec<(Section, f64)>) -> SectionMGRList<'a> {
-        info!("Geometry: {:?}", geometry);
-        info!("Geometry Len: {:?}", geometry.len());
+        // info!("Geometry: {:?}", geometry);
+        // info!("Geometry Len: {:?}", geometry.len());
         let mut section_set = HashSet::new();
 
         for (s, _) in geometry {
             section_set.insert(format!("{}", s));
         }
 
-        debug!("Section Set: {:?}", section_set.len());
-        debug!("Section Set: {:?}", section_set);
+        // debug!("Section Set: {:?}", section_set.len());
+        // debug!("Section Set: {:?}", section_set);
         let mut state = ListState::default();
         let items: Vec<(Section, ListItem)> = [0, 1, 2, 3, 4]
             .iter()
@@ -89,7 +89,7 @@ impl<'a> SectionMGRList<'a> {
 }
 
 pub fn render_section_mgr(list: &mut SectionMGRList<'_>, area: Rect, f: &mut Frame<'_, ZBackend>) {
-    debug!("Rendering Section Manager");
+    // debug!("Rendering Section Manager");
 
     let layout = Layout::default()
         .margin(5)

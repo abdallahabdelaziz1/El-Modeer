@@ -80,7 +80,8 @@ pub fn render_process_table(
                 }
                 None => (),
             };
-
+            // TODO: update to be dynamic
+            // make a loop and push cells to the vector
             let mut row = vec![
                 Cell::from(format!("{: >width$}", p.pid, width = app.max_pid_len)),
                 Cell::from(format!("{: <10}", p.user_name)),
@@ -172,6 +173,7 @@ pub fn render_process_table(
         })
         .collect();
 
+    // TODO: Make sure to update the header as well
     let mut header = vec![
         format!("{:<width$}", "PID", width = app.max_pid_len + 1),
         String::from("USER       "),
