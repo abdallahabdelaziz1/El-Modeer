@@ -2,6 +2,7 @@
  * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
  */
 mod cpu;
+mod system_info;
 mod disk;
 mod graphics;
 mod help;
@@ -19,13 +20,14 @@ use crate::metrics::*;
 use crate::renderer::section::{sum_section_heights, Section, SectionMGRList};
 use crate::renderer::column::{Column, ColumnMGRList};
 use crate::util::*;
+use crate::{convert_result_to_string, convert_error_to_string};
 use crossterm::{
     event::{KeyCode as Key, KeyEvent, KeyModifiers},
     execute,
     terminal::EnterAlternateScreen,
 };
 use num_traits::FromPrimitive;
-use std::cmp::Eq;
+// use std::cmp::Eq;
 use std::io;
 use std::io::Stdout;
 use std::path::PathBuf;
@@ -37,6 +39,8 @@ use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders};
 use tui::Frame;
+use heim::process as hproc;
+use heim::process::ProcessError;
 
 const PROCESS_SELECTION_GRACE: Duration = Duration::from_millis(2000);
 const LEFT_PANE_WIDTH: u16 = 34u16;
@@ -214,12 +218,16 @@ pub struct TerminalRenderer<'a> {
     selected_section_index: usize,
     constraints: Vec<Constraint>,
     process_message: Option<String>,
+    process_table_message: String,
     show_help: bool,
     show_paths: bool,
     show_find: bool,
+    show_kill: bool,
     show_section_mgr: bool,
     show_column_mgr: bool,
+    freeze: bool,
     filter: String,
+    kill_pid: String,
     highlighted_row: usize,
     selection_grace_start: Option<Instant>,
     section_manager_options: SectionMGRList<'a>,
@@ -285,13 +293,17 @@ impl<'a> TerminalRenderer<'_> {
             selected_section_index: section_geometry.len() - 1,
             constraints,
             process_message: None,
+            process_table_message: String::from(""),
             // hist_start_offset: 0,
             show_help: false,
             show_paths: false,
             show_find: false,
+            show_kill: false,
             show_section_mgr: false,
             show_column_mgr: false,
+            freeze: false,
             filter: String::from(""),
+            kill_pid: String::from(""),
             highlighted_row: 0,
             selection_grace_start: None,
             section_manager_options: SectionMGRList::with_geometry(section_geometry),
@@ -347,7 +359,7 @@ impl<'a> TerminalRenderer<'_> {
 
     pub async fn start(&mut self) {
         // debug!("Starting Main Loop.");
-        let disable_history = false;
+      //  let disable_history = false;
         if self.recompute_constraints_on_start_up {
             self.recompute_constraints();
             self.recompute_constraints_on_start_up = false;
@@ -364,14 +376,18 @@ impl<'a> TerminalRenderer<'_> {
             let column_manager_options = &mut self.column_manager_options;
             let selected = self.section_geometry[self.selected_section_index].0;
             let process_message = &self.process_message;
+            let process_table_message = &self.process_table_message;
             // let offset = &self.hist_start_offset;
             let un = &self.update_number;
             let show_help = self.show_help;
             let show_section_mgr = self.show_section_mgr;
             let show_column_mgr = self.show_column_mgr;
             let show_paths = self.show_paths;
+            let freeze = self.freeze;
             let filter = &self.filter;
             let show_find = self.show_find;
+            let show_kill = self.show_kill;
+            let kill_pid = &self.kill_pid;
             let mut highlighted_process: Option<Box<ZProcess>> = None;
             let process_table = process::filter_process_table(app, &self.filter);
             // let gfx_device_index = &self.gfx_device_index;
@@ -435,11 +451,19 @@ impl<'a> TerminalRenderer<'_> {
                             let v_section = v_sections[section_index + 1];
                             let current_section = geometry[section_index].0;
                             let border_style = if current_section == selected {
-                                Style::default().fg(Color::Red)
+                                Style::default()
                             } else {
                                 Style::default()
                             };
                             match current_section {
+                                Section::SystemInfo => {
+                                    system_info::render_system_info(
+                                        app,
+                                        v_section,
+                                        f,
+                                        border_style,
+                                    );
+                                }
                                 // Section::Cpu => {
                                 //     cpu::render_cpu(app, v_section, f, view, border_style)
                                 // }
@@ -472,7 +496,9 @@ impl<'a> TerminalRenderer<'_> {
                                             border_style,
                                             process_message,
                                             p,
+                                            freeze
                                         );
+
                                     } else {
                                         highlighted_process = process::render_process_table(
                                             app,
@@ -483,16 +509,19 @@ impl<'a> TerminalRenderer<'_> {
                                             border_style,
                                             show_paths,
                                             show_find,
+                                            show_kill,
                                             filter,
+                                            kill_pid,
+                                            process_table_message,
                                             highlighted_row,
+                                            freeze
                                         );
                                         if v_section.height > 4 {
                                             // account for table border & margins.
                                             process_table_height = v_section.height - 5;
                                         }
                                     }
-                                },
-                                _ => {}
+                                }
                             }
                         }
                     }
@@ -551,11 +580,14 @@ impl<'a> TerminalRenderer<'_> {
         let keep_order =
             self.app.selected_process.is_some() || self.selection_grace_start.is_some();
 
-        self.app.update(keep_order).await;
-        self.update_number += 1;
-        if self.update_number == self.zoom_factor {
-            self.update_number = 0;
+        if !self.freeze {
+            self.app.update(keep_order).await;
+            self.update_number += 1;
+            if self.update_number == self.zoom_factor {
+                self.update_number = 0;
+            }
         }
+       
     }
 
     async fn process_key_event(
@@ -583,17 +615,36 @@ impl<'a> TerminalRenderer<'_> {
             ),
             // Key::Left => self.histogram_left(),
             // Key::Right => self.histogram_right(),
-            Key::Enter => self.select(highlighted_process),
+            Key::Enter => {
+                if self.show_kill {
+                    if self.kill_pid.chars().all(|c| c.is_digit(10)) {
+                        self.process_table_message = match hproc::get(self.kill_pid.parse().unwrap()).await {
+                            Ok(p) => convert_result_to_string!(p.kill().await),
+                            Err(e) => convert_error_to_string!(e),
+                        };
+                    } else {
+                        self.process_table_message = "Invalid PID".to_string();
+                    }
+
+                    self.kill_pid = String::new();
+                } else {
+                    self.select(highlighted_process);
+                }
+            }
             Key::Char('c') => {
                 if input.modifiers.contains(KeyModifiers::CONTROL) {
                     return Action::Quit;
                 } else if self.show_find {
                     self.process_find_input(input);
-                }
+                } else if self.show_kill {
+                    self.process_kill_input(input);
+                } 
             }
             _other => {
                 if self.show_find {
                     self.process_find_input(input);
+                } else if self.show_kill {
+                    self.process_kill_input(input);
                 } else {
                     return self.process_toplevel_input(input).await;
                 }
@@ -607,7 +658,9 @@ impl<'a> TerminalRenderer<'_> {
         if selected == Section::Process {
             self.app.select_process(highlighted_process);
             self.process_message = None;
+            self.process_table_message = String::from("");
             self.show_find = false;
+            self.show_kill = false;
             self.process_table_row_start = 0;
         }
     }
@@ -747,6 +800,29 @@ impl<'a> TerminalRenderer<'_> {
             Key::Backspace => match self.filter.pop() {
                 Some(_c) => {}
                 None => self.show_find = false,
+            },
+            _ => {}
+        }
+    }
+
+    fn process_kill_input(&mut self, input: KeyEvent) {
+        match input.code {
+            Key::Esc => {
+                self.show_kill = false;
+                self.kill_pid = String::from("");
+            }
+            Key::Char(c) if c != '\n' => {
+                self.selection_grace_start = Some(Instant::now());
+                self.process_table_message = String::from("");
+                self.kill_pid.push(c)
+            }
+            Key::Delete => match self.kill_pid.pop() {
+                Some(_c) => {}
+                None => self.show_kill = false,
+            },
+            Key::Backspace => match self.kill_pid.pop() {
+                Some(_c) => {}
+                None => self.show_kill = false,
             },
             _ => {}
         }
@@ -904,6 +980,9 @@ impl<'a> TerminalRenderer<'_> {
                 };
             }
             Key::Char('k') => {
+                if self.app.selected_process.is_none() {
+                    self.show_kill = true;
+                }
                 self.process_message = match &self.app.selected_process {
                     Some(p) => Some(p.kill().await),
                     None => None,
@@ -925,18 +1004,18 @@ impl<'a> TerminalRenderer<'_> {
                     .as_mut()
                     .map(|p| p.set_priority(0));
             }
-            k @ Key::Tab | k @ Key::BackTab => {
-                // hopefully cross platform enough regarding https://github.com/crossterm-rs/crossterm/issues/442
-                self.selected_section_index =
-                    if k == Key::BackTab || input.modifiers.contains(KeyModifiers::SHIFT) {
-                        match self.selected_section_index {
-                            0 => self.section_geometry.len() - 1,
-                            x => x - 1,
-                        }
-                    } else {
-                        (self.selected_section_index + 1) % self.section_geometry.len()
-                    };
-            }
+            // k @ Key::Tab | k @ Key::BackTab => {
+            //     // hopefully cross platform enough regarding https://github.com/crossterm-rs/crossterm/issues/442
+            //     self.selected_section_index =
+            //         if k == Key::BackTab || input.modifiers.contains(KeyModifiers::SHIFT) {
+            //             match self.selected_section_index {
+            //                 0 => self.section_geometry.len() - 1,
+            //                 x => x - 1,
+            //             }
+            //         } else {
+            //             (self.selected_section_index + 1) % self.section_geometry.len()
+            //         };
+            // }
             Key::Char(' ') => {
                 self.toggle_section();
             }
@@ -958,6 +1037,9 @@ impl<'a> TerminalRenderer<'_> {
             }
             Key::Char('h') => {
                 self.show_help = !self.show_help;
+            }
+            Key::Char('f') => {
+                self.freeze = !self.freeze;
             }
             Key::Char('p') => {
                 self.show_paths = !self.show_paths;

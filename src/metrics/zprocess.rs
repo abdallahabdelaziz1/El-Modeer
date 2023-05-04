@@ -20,26 +20,7 @@ use sysinfo::ProcessStatus;
 use chrono::prelude::DateTime;
 use chrono::Duration as CDuration;
 use chrono::Local;
-
-macro_rules! convert_result_to_string {
-    ($x:expr) => {
-        match $x {
-            Ok(_r) => String::from("Signal Sent."),
-            Err(e) => convert_error_to_string!(e),
-        }
-    };
-}
-
-macro_rules! convert_error_to_string {
-    ($x:expr) => {
-        match $x {
-            ProcessError::NoSuchProcess { .. } => String::from("No Such Process"),
-            ProcessError::ZombieProcess { .. } => String::from("Zombie Process"),
-            ProcessError::AccessDenied { .. } => String::from("Access Denied"),
-            _ => String::from("Unknown error"),
-        }
-    };
-}
+use crate::{convert_result_to_string, convert_error_to_string};
 
 #[derive(Clone)]
 pub struct ZProcess {
@@ -73,6 +54,7 @@ pub struct ZProcess {
     pub swap_delay: Duration,
     pub prev_io_delay: Duration,
     pub prev_swap_delay: Duration,
+    pub et: DateTime<Local>, 
 }
 
 impl ZProcess {
@@ -109,6 +91,7 @@ impl ZProcess {
             swap_delay: Duration::from_nanos(0),
             prev_io_delay: Duration::from_nanos(0),
             prev_swap_delay: Duration::from_nanos(0),
+            et: Local::now(),
         }
     }
     pub fn get_read_bytes_sec(&self, tick_rate: &Duration) -> f64 {
@@ -160,11 +143,11 @@ impl ZProcess {
 
     pub fn get_run_duration(&self) -> CDuration {
         let start_time = DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(self.start_time));
-        let et = match self.end_time {
-            Some(t) => DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(t)),
-            None => Local::now(),
-        };
-        et - start_time
+        // let et = match self.end_time {
+        //     Some(t) => DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(t)),
+        //     None => Local::now(),
+        // };
+        self.et - start_time
     }
 
     #[cfg(target_os = "linux")]

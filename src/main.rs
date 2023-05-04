@@ -119,19 +119,20 @@ macro_rules! exit_with_message {
 }
 
 fn create_geometry(
-    cpu_height: u16,
+    system_info_height: u16,
+    process_height: u16,
     // net_height: u16,
     // disk_height: u16,
-    process_height: u16,
     // sensor_height: u16,
     // graphics_height: u16,
 ) -> Vec<(Section, f64)> {
     let mut geometry: Vec<(Section, f64)> = Vec::new();
-    push_geometry!(geometry, Section::Cpu, cpu_height);
+    push_geometry!(geometry, Section::SystemInfo, system_info_height);
+    push_geometry!(geometry, Section::Process, process_height);
+    // push_geometry!(geometry, Section::Cpu, cpu_height);
     // push_geometry!(geometry, Section::Network, net_height);
     // push_geometry!(geometry, Section::Disk, disk_height);
     // push_geometry!(geometry, Section::Graphics, graphics_height);
-    push_geometry!(geometry, Section::Process, process_height);
     // assert_eq!(sensor_height, 0); // not implemented
 
     if geometry.is_empty() {
@@ -161,10 +162,10 @@ fn create_geometry(
 
 fn start_zenith(
     rate: u64,
-    cpu_height: u16,
+    system_info_height: u16,
+    process_height: u16,
     // net_height: u16,
     // disk_height: u16,
-    process_height: u16,
     // sensor_height: u16,
     // graphics_height: u16,
     // disable_history: bool,
@@ -247,10 +248,10 @@ fn start_zenith(
         // debug!("Create Renderer");
 
         let geometry: Vec<(Section, f64)> = create_geometry(
-            cpu_height,
+            system_info_height,
+            process_height,
             // net_height,
             // disk_height,
-            process_height,
             // sensor_height,
             // graphics_height,
         );
@@ -338,7 +339,7 @@ Usage: {} [OPTIONS]
 
     start_zenith(
         opts.refresh_rate,
-        0, 
+        opts.system_info_height, 
         opts.process_height,
         // 0,
         // 0,
@@ -365,17 +366,22 @@ struct ZOptions {
     // #[options(short = "c", long = "cpu-height", default = "17", meta = "INT")]
     // cpu_height: u16,
 
+
     /// Database to use, if any.
     // #[options(no_short, default_expr = "default_db_path()", meta = "STRING")]
     // db: String,
-
+    
     /// Min Percent Height of Disk visualization.
     // #[options(short = "d", long = "disk-height", default = "17", meta = "INT")]
     // disk_height: u16,
-
+    
     /// Min Percent Height of Network visualization.
     // #[options(short = "n", long = "net-height", default = "17", meta = "INT")]
     // net_height: u16,
+    
+    /// Min Percent Height of CPU/Memory visualization.
+    #[options(short = "s", long = "system-info-height", default = "7", meta = "INT")]
+    system_info_height: u16,
 
     /// Min Percent Height of Process Table.
     #[options(short = "p", long = "process-height", default = "32", meta = "INT")]
