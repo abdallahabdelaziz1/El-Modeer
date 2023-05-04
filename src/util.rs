@@ -106,46 +106,46 @@ impl Events {
     }
 }
 
-/// Keeps a file open exclusively
-/// Removes the file when dropped
-pub struct Lockfile {
-    file: File,
-    path: PathBuf,
-}
+// /// Keeps a file open exclusively
+// /// Removes the file when dropped
+// pub struct Lockfile {
+//     file: File,
+//     path: PathBuf,
+// }
 
-impl Lockfile {
-    /// Tries to open the file creating if it does not exist
-    /// Fails if zenith is already running using the same lockfile
-    pub async fn new(main_pid: u32, path: &Path) -> Option<Self> {
-        if is_zenith_running(path).await {
-            debug!("{}", path.to_string_lossy());
-            return None;
-        }
+// impl Lockfile {
+//     /// Tries to open the file creating if it does not exist
+//     /// Fails if zenith is already running using the same lockfile
+//     pub async fn new(main_pid: u32, path: &Path) -> Option<Self> {
+//         if is_zenith_running(path).await {
+//             debug!("{}", path.to_string_lossy());
+//             return None;
+//         }
 
-        let mut file = File::create(path).ok()?;
+//         let mut file = File::create(path).ok()?;
 
-        file.write_all(main_pid.to_string().as_bytes()).ok()?;
+//         file.write_all(main_pid.to_string().as_bytes()).ok()?;
 
-        Some(Self {
-            file,
-            path: path.into(),
-        })
-    }
-}
+//         Some(Self {
+//             file,
+//             path: path.into(),
+//         })
+//     }
+// }
 
-impl Drop for Lockfile {
-    fn drop(&mut self) {
-        debug!("Removing Lock");
-        let res = remove_file(&self.path);
-        if let Err(e) = res {
-            error!(
-                "Error deleting lockfile: path={}, error={:?}",
-                self.path.display(),
-                e
-            );
-        }
-    }
-}
+// impl Drop for Lockfile {
+//     fn drop(&mut self) {
+//         debug!("Removing Lock");
+//         let res = remove_file(&self.path);
+//         if let Err(e) = res {
+//             error!(
+//                 "Error deleting lockfile: path={}, error={:?}",
+//                 self.path.display(),
+//                 e
+//             );
+//         }
+//     }
+// }
 
 async fn is_zenith_running(path: &Path) -> bool {
     name_of_process_for_pidfile(path)

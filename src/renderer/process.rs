@@ -30,9 +30,10 @@ pub fn render_process_table(
     kill_pid: &str,
     process_table_message: &String,
     highlighted_row: usize,
+    freeze: bool,
 ) -> Option<Box<ZProcess>> {
     // 4 for the margins and table header
-    let display_height = match area.height.saturating_sub(3) {
+    let display_height = match area.height.saturating_sub(4) {
         0 => return None,
         v => v as usize,
     };
@@ -237,9 +238,7 @@ pub fn render_process_table(
         format!("[ESC] Clear, PID to kill: {:}{}", kill_pid, process_table_message)
     } else {
         format!(
-            "Tasks [{:}] Threads [{:}]  Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k]",
-            app.processes.len(),
-            app.threads_total
+            "Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k]",
         )
     };
 
@@ -258,6 +257,19 @@ pub fn render_process_table(
                 .bottom_margin(0),
         )
         .render(f, area);
+
+
+    let mut frozen_text = vec![Spans::from(vec![
+            Span::styled("  FROZEN  ", Style::default().fg(Color::White).bg(Color::Blue).add_modifier(Modifier::BOLD)),
+        ])];
+        
+    if freeze{
+        Paragraph::new(frozen_text)
+        .block(Block::default())
+        .render(f, Rect::new(1, f.size().height.saturating_sub(2), 12, 1));
+    }
+
+
     highlighted_process
 }
 
@@ -268,6 +280,7 @@ pub fn render_process(
     border_style: Style,
     process_message: &Option<String>,
     p: &ZProcess,
+    freeze: bool
 ) {
     Block::default()
         .title(Span::styled(format!("Process: {0}", p.name), border_style))
@@ -410,6 +423,10 @@ pub fn render_process(
         ]),
     ];
 
+    let mut frozen_text = vec![Spans::from(vec![
+        Span::styled("  FROZEN  ", Style::default().fg(Color::White).bg(Color::Blue).add_modifier(Modifier::BOLD)),
+    ])];
+
     // if !app.gfx_devices.is_empty() {
     //     text.push(Spans::from(vec![
     //         Span::raw("SM Util:            "),
@@ -478,11 +495,18 @@ pub fn render_process(
             .block(Block::default())
             .wrap(Wrap { trim: false })
             .render(f, h_sections[2]);
+
     } else {
         Paragraph::new(text)
-            .block(Block::default())
-            .wrap(Wrap { trim: true })
-            .render(f, v_sections[1]);
+        .block(Block::default())
+        .wrap(Wrap { trim: true })
+        .render(f, v_sections[1]);
+    }
+    
+    if freeze{
+        Paragraph::new(frozen_text)
+        .block(Block::default())
+        .render(f, Rect::new(1, f.size().height.saturating_sub(2), 12, 1));
     }
 }
 

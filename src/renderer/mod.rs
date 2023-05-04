@@ -221,6 +221,7 @@ pub struct TerminalRenderer<'a> {
     show_find: bool,
     show_kill: bool,
     show_section_mgr: bool,
+    freeze: bool,
     filter: String,
     kill_pid: String,
     highlighted_row: usize,
@@ -282,6 +283,7 @@ impl<'a> TerminalRenderer<'_> {
             show_find: false,
             show_kill: false,
             show_section_mgr: false,
+            freeze: false,
             filter: String::from(""),
             kill_pid: String::from(""),
             highlighted_row: 0,
@@ -338,7 +340,7 @@ impl<'a> TerminalRenderer<'_> {
 
     pub async fn start(&mut self) {
         // debug!("Starting Main Loop.");
-        let disable_history = false;
+      //  let disable_history = false;
         if self.recompute_constraints_on_start_up {
             self.recompute_constraints();
             self.recompute_constraints_on_start_up = false;
@@ -360,6 +362,7 @@ impl<'a> TerminalRenderer<'_> {
             let show_help = self.show_help;
             let show_section_mgr = self.show_section_mgr;
             let show_paths = self.show_paths;
+            let freeze = self.freeze;
             let filter = &self.filter;
             let show_find = self.show_find;
             let show_kill = self.show_kill;
@@ -465,7 +468,9 @@ impl<'a> TerminalRenderer<'_> {
                                             border_style,
                                             process_message,
                                             p,
+                                            freeze
                                         );
+
                                     } else {
                                         highlighted_process = process::render_process_table(
                                             app,
@@ -481,6 +486,7 @@ impl<'a> TerminalRenderer<'_> {
                                             kill_pid,
                                             process_table_message,
                                             highlighted_row,
+                                            freeze
                                         );
                                         if v_section.height > 4 {
                                             // account for table border & margins.
@@ -546,11 +552,14 @@ impl<'a> TerminalRenderer<'_> {
         let keep_order =
             self.app.selected_process.is_some() || self.selection_grace_start.is_some();
 
-        self.app.update(keep_order).await;
-        self.update_number += 1;
-        if self.update_number == self.zoom_factor {
-            self.update_number = 0;
+        if !self.freeze {
+            self.app.update(keep_order).await;
+            self.update_number += 1;
+            if self.update_number == self.zoom_factor {
+                self.update_number = 0;
+            }
         }
+       
     }
 
     async fn process_key_event(
@@ -925,6 +934,9 @@ impl<'a> TerminalRenderer<'_> {
             }
             Key::Char('h') => {
                 self.show_help = !self.show_help;
+            }
+            Key::Char('f') => {
+                self.freeze = !self.freeze;
             }
             Key::Char('p') => {
                 self.show_paths = !self.show_paths;

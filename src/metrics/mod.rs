@@ -20,6 +20,9 @@ use heim::units::frequency::megahertz;
 use heim::units::time;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
+use chrono::prelude::DateTime;
+use std::time::{UNIX_EPOCH};
+use chrono::Local;
 
 #[cfg(target_os = "linux")]
 use linux_taskstats::{self, Client};
@@ -533,6 +536,12 @@ impl CPUTimeApp {
                     zp.read_bytes = disk_usage.total_read_bytes;
                     zp.write_bytes = disk_usage.total_written_bytes;
                     zp.last_updated = SystemTime::now();
+
+                    zp.et = match zp.end_time {
+                        Some(t) => DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(t)),
+                        None => Local::now(),
+                    };
+
                     // #[cfg(target_os = "linux")]
                     // zp.update_delay(client);
 

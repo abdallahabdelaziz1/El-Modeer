@@ -23,7 +23,8 @@ pub fn render_help(
 
     static GLOBAL_KEYS: &[[&str; 2]] = &[
         ["h    ", "    Toggle this help screen\n"],
-        ["q    ", "    Quit and exit zenith\n"],
+        ["q    ", "    Quit and exit El-Modeer\n"],
+        ["f    ", "    Freeze refreshing\n"],
         ["<TAB>", "    Changes highlighted section\n"],
         ["e    ", "    Expands highlighted section\n"],
         ["m    ", "    Shrinks highlighted section\n"],
