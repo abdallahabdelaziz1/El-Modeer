@@ -167,3 +167,7 @@ pub fn percent_of(numerator: u64, denominator: u64) -> f32 {
         (numerator as f32 / denominator as f32) * 100.0
     }
 }
+
+pub fn to_gb(bytes: u64) -> f32 {
+    bytes as f32 / 1024.0 / 1024.0
+}

@@ -2,6 +2,7 @@
  * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
  */
 mod cpu;
+mod system_info;
 mod disk;
 mod graphics;
 mod help;
@@ -23,7 +24,7 @@ use crossterm::{
     terminal::EnterAlternateScreen,
 };
 use num_traits::FromPrimitive;
-use std::cmp::Eq;
+// use std::cmp::Eq;
 use std::io;
 use std::io::Stdout;
 use std::path::PathBuf;
@@ -410,11 +411,19 @@ impl<'a> TerminalRenderer<'_> {
                             let v_section = v_sections[section_index + 1];
                             let current_section = geometry[section_index].0;
                             let border_style = if current_section == selected {
-                                Style::default().fg(Color::Red)
+                                Style::default()
                             } else {
                                 Style::default()
                             };
                             match current_section {
+                                Section::SystemInfo => {
+                                    system_info::render_system_info(
+                                        app,
+                                        v_section,
+                                        f,
+                                        border_style,
+                                    );
+                                }
                                 // Section::Cpu => {
                                 //     cpu::render_cpu(app, v_section, f, view, border_style)
                                 // }
@@ -469,8 +478,7 @@ impl<'a> TerminalRenderer<'_> {
                                             process_table_height = v_section.height - 5;
                                         }
                                     }
-                                },
-                                _ => {}
+                                }
                             }
                         }
                     }
@@ -834,18 +842,18 @@ impl<'a> TerminalRenderer<'_> {
                     .as_mut()
                     .map(|p| p.set_priority(0));
             }
-            k @ Key::Tab | k @ Key::BackTab => {
-                // hopefully cross platform enough regarding https://github.com/crossterm-rs/crossterm/issues/442
-                self.selected_section_index =
-                    if k == Key::BackTab || input.modifiers.contains(KeyModifiers::SHIFT) {
-                        match self.selected_section_index {
-                            0 => self.section_geometry.len() - 1,
-                            x => x - 1,
-                        }
-                    } else {
-                        (self.selected_section_index + 1) % self.section_geometry.len()
-                    };
-            }
+            // k @ Key::Tab | k @ Key::BackTab => {
+            //     // hopefully cross platform enough regarding https://github.com/crossterm-rs/crossterm/issues/442
+            //     self.selected_section_index =
+            //         if k == Key::BackTab || input.modifiers.contains(KeyModifiers::SHIFT) {
+            //             match self.selected_section_index {
+            //                 0 => self.section_geometry.len() - 1,
+            //                 x => x - 1,
+            //             }
+            //         } else {
+            //             (self.selected_section_index + 1) % self.section_geometry.len()
+            //         };
+            // }
             Key::Char(' ') => {
                 self.toggle_section();
             }

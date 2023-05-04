@@ -35,7 +35,7 @@ use nvml::{cuda_driver_version_major, cuda_driver_version_minor};
 use std::fs;
 use std::path::{Path, PathBuf};
 use sysinfo::{
-    Component, ComponentExt, Disk, DiskExt, NetworkExt, ProcessExt, ProcessorExt, System, SystemExt,
+    Component, ComponentExt, Disk, DiskExt, NetworkExt, ProcessExt, ProcessStatus, ProcessorExt, System, SystemExt,
 };
 use users::{Users, UsersCache};
 
@@ -229,22 +229,29 @@ pub struct CPUTimeApp {
     pub mem_total: u64,
     pub swap_utilization: u64,
     pub swap_total: u64,
+    pub cpus: Vec<(String, f32)>,
+
+    // Processes data 
+    pub total_processes: usize,
+    pub running_processes: u64,
+    pub sleeping_processes: u64,
+    pub stopped_processes: u64,
+    pub zombie_processes: u64,
+    pub processes: Vec<i32>,
+    pub process_map: HashMap<i32, ZProcess>,
+    pub psortby: ProcessTableSortBy,
+    pub psortorder: ProcessTableSortOrder,
     // pub disks: HashMap<String, ZDisk>,
     pub disk_write: u64,
     pub disk_read: u64,
-    pub cpus: Vec<(String, u64)>,
     pub system: System,
     pub net_in: u64,
     pub net_out: u64,
-    pub processes: Vec<i32>,
-    pub process_map: HashMap<i32, ZProcess>,
     pub user_cache: UsersCache,
     pub cum_cpu_process: Option<ZProcess>,
     pub top_pids: Top,
     pub frequency: u64,
     pub threads_total: usize,
-    pub psortby: ProcessTableSortBy,
-    pub psortorder: ProcessTableSortOrder,
     pub osname: String,
     pub release: String,
     pub version: String,
@@ -320,6 +327,12 @@ impl CPUTimeApp {
             mem_total: 0,
             swap_total: 0,
             swap_utilization: 0,
+
+            total_processes: 0,
+            running_processes: 0,
+            sleeping_processes: 0,
+            stopped_processes: 0,
+            zombie_processes: 0,
           //  disks: HashMap::with_capacity(10),
             net_in: 0,
             net_out: 0,
@@ -491,8 +504,20 @@ impl CPUTimeApp {
         };
 
         self.threads_total = 0;
-
+        self.total_processes = process_list.len();
+        self.running_processes = 0;
+        self.sleeping_processes = 0;
+        self.stopped_processes = 0;
+        self.zombie_processes = 0;
         for (pid, process) in process_list {
+            match process.status() {
+            ProcessStatus::Run => self.running_processes += 1,
+            ProcessStatus::Sleep => self.sleeping_processes += 1,
+            ProcessStatus::Stop => self.stopped_processes += 1,
+            ProcessStatus::Zombie => self.zombie_processes += 1,
+            _ => (),
+            }
+
             if let Some(zp) = self.process_map.get_mut(pid) {
                 if zp.start_time == process.start_time() {
                     let disk_usage = process.disk_usage();
@@ -760,33 +785,33 @@ impl CPUTimeApp {
     //     }
     // }
 
-    // pub async fn update_cpu(&mut self) {
-    //     debug!("Updating CPU");
-    //     let procs = self.system.get_processors();
-    //     let mut usage: f32 = 0.0;
-    //     self.cpus.clear();
-    //     let mut usagev: Vec<f32> = vec![];
-    //     for (i, p) in procs.iter().enumerate() {
-    //         if i == 0 {
-    //             self.processor_name = p.get_name().to_owned();
-    //         }
-    //         let mut u = p.get_cpu_usage();
-    //         if u.is_nan() {
-    //             u = 0.0;
-    //         }
-    //         self.cpus.push((format!("{}", i + 1), u as u64));
-    //         usage += u;
-    //         usagev.push(u);
-    //     }
-    //     if procs.is_empty() {
-    //         self.cpu_utilization = 0;
-    //     } else {
-    //         usage /= procs.len() as f32;
-    //         self.cpu_utilization = usage as u64;
-    //     }
-    //     self.histogram_map
-    //         .add_value_to(&HistogramKind::Cpu, self.cpu_utilization);
-    // }
+    pub async fn update_cpu(&mut self) {
+        // debug!("Updating CPU");
+        let procs = self.system.get_processors();
+        let mut usage: f32 = 0.0;
+        self.cpus.clear();
+        let mut usagev: Vec<f32> = vec![];
+        for (i, p) in procs.iter().enumerate() {
+            if i == 0 {
+                self.processor_name = p.get_name().to_owned();
+            }
+            let mut u = p.get_cpu_usage();
+            if u.is_nan() {
+                u = 0.0;
+            }
+            self.cpus.push((format!("{}", i + 1), u));
+            usage += u;
+            usagev.push(u);
+        }
+        if procs.is_empty() {
+            self.cpu_utilization = 0;
+        } else {
+            usage /= procs.len() as f32;
+            self.cpu_utilization = usage as u64;
+        }
+        // self.histogram_map
+        //     .add_value_to(&HistogramKind::Cpu, self.cpu_utilization);
+    }
 
     // pub async fn update_networks(&mut self) {
     //     let mut net_in = 0;
@@ -805,20 +830,22 @@ impl CPUTimeApp {
     // }
 
     pub async fn update(&mut self, keep_order: bool) {
-        debug!("Updating Metrics");
+        // debug!("Updating Metrics");
         self.system.refresh_all();
-        // self.update_cpu().await;
+        self.update_cpu().await;
         self.update_sensors().await;
 
         self.mem_utilization = self.system.get_used_memory();
         self.mem_total = self.system.get_total_memory();
 
-        let mem = percent_of(self.mem_utilization, self.mem_total) as u64;
+        self.swap_utilization = self.system.get_used_swap();
+        self.swap_total = self.system.get_total_swap();
+        
+        
+        // let mem = percent_of(self.mem_utilization, self.mem_total) as u64;
 
         // self.histogram_map.add_value_to(&HistogramKind::Mem, mem);
 
-        self.swap_utilization = self.system.get_used_swap();
-        self.swap_total = self.system.get_total_swap();
 
         // self.update_networks().await;
         self.update_process_list(keep_order);
