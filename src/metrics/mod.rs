@@ -1,15 +1,12 @@
 pub mod disk;
-/**
- * Copyright 2019-2020, Benjamin Vaisvil and the zenith contributors
- */
 pub mod graphics;
 pub mod histogram;
-pub mod zprocess;
+pub mod mprocess;
 
 // use crate::metrics::disk::{get_device_name, get_disk_io_metrics, IoMetrics, ZDisk};
 // use crate::metrics::graphics::device::{GraphicsDevice, GraphicsExt};
 // use crate::metrics::histogram::{HistogramKind, HistogramMap};
-use crate::metrics::zprocess::ZProcess;
+use crate::metrics::mprocess::MProcess;
 use crate::util::percent_of;
 
 use futures::StreamExt;
@@ -25,7 +22,7 @@ use std::time::{UNIX_EPOCH};
 use chrono::Local;
 
 #[cfg(target_os = "linux")]
-use linux_taskstats::{self, Client};
+// use linux_taskstats::{self, Client};
 
 #[cfg(all(feature = "nvidia", target_os = "linux"))]
 use nvml::error::NvmlError;
@@ -33,9 +30,9 @@ use nvml::error::NvmlError;
 use nvml::{cuda_driver_version_major, cuda_driver_version_minor};
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use sysinfo::{
-    Component, ComponentExt, Disk, DiskExt, NetworkExt, ProcessExt, ProcessStatus, ProcessorExt, System, SystemExt,
+    Component, ComponentExt, Disk, DiskExt, ProcessExt, ProcessStatus, ProcessorExt, System, SystemExt,
 };
 use users::{Users, UsersCache};
 
@@ -182,12 +179,12 @@ pub struct ValAndPid<T> {
     pub pid: Option<i32>,
 }
 impl<T: PartialOrd> ValAndPid<T> {
-    fn update(&mut self, new: T, pid: i32) {
-        if new > self.val {
-            self.val = new;
-            self.pid = Some(pid);
-        }
-    }
+    // fn update(&mut self, new: T, pid: i32) {
+    //     if new > self.val {
+    //         self.val = new;
+    //         self.pid = Some(pid);
+    //     }
+    // }
 }
 
 #[derive(Default, Debug)]
@@ -206,20 +203,20 @@ pub struct Top {
     pub frame_buffer: ValAndPid<u64>,
 }
 impl Top {
-    fn update(&mut self, zp: &ZProcess, tick_rate: &Duration) {
-        self.cum_cpu.update(zp.cum_cpu_usage, zp.pid);
-        self.cpu.update(zp.cpu_usage, zp.pid);
-        self.mem.update(zp.memory, zp.pid);
-        self.virt.update(zp.virtual_memory, zp.pid);
-        self.read.update(zp.get_read_bytes_sec(tick_rate), zp.pid);
-        self.write.update(zp.get_write_bytes_sec(tick_rate), zp.pid);
-        #[cfg(target_os = "linux")]
-        self.iowait.update(zp.get_io_wait(tick_rate), zp.pid);
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        self.gpu.update(zp.gpu_usage, zp.pid);
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        self.frame_buffer.update(zp.fb_utilization, zp.pid);
-    }
+    // fn update(&mut self, zp: &MProcess, tick_rate: &Duration) {
+    //     self.cum_cpu.update(zp.cum_cpu_usage, zp.pid);
+    //     self.cpu.update(zp.cpu_usage, zp.pid);
+    //     self.mem.update(zp.memory, zp.pid);
+    //     self.virt.update(zp.virtual_memory, zp.pid);
+    //     self.read.update(zp.get_read_bytes_sec(tick_rate), zp.pid);
+    //     self.write.update(zp.get_write_bytes_sec(tick_rate), zp.pid);
+    //     #[cfg(target_os = "linux")]
+    //     self.iowait.update(zp.get_io_wait(tick_rate), zp.pid);
+    //     #[cfg(all(target_os = "linux", feature = "nvidia"))]
+    //     self.gpu.update(zp.gpu_usage, zp.pid);
+    //     #[cfg(all(target_os = "linux", feature = "nvidia"))]
+    //     self.frame_buffer.update(zp.fb_utilization, zp.pid);
+    // }
 }
 
 pub struct CPUTimeApp {
@@ -238,7 +235,7 @@ pub struct CPUTimeApp {
     pub stopped_processes: u64,
     pub zombie_processes: u64,
     pub processes: Vec<i32>,
-    pub process_map: HashMap<i32, ZProcess>,
+    pub process_map: HashMap<i32, MProcess>,
     pub psortby: ProcessTableSortBy,
     pub psortorder: ProcessTableSortOrder,
     // pub disks: HashMap<String, ZDisk>,
@@ -248,7 +245,7 @@ pub struct CPUTimeApp {
     pub net_in: u64,
     pub net_out: u64,
     pub user_cache: UsersCache,
-    pub cum_cpu_process: Option<ZProcess>,
+    pub cum_cpu_process: Option<MProcess>,
     pub top_pids: Top,
     pub frequency: u64,
     pub threads_total: usize,
@@ -262,7 +259,7 @@ pub struct CPUTimeApp {
     // pub gfx_devices: Vec<GraphicsDevice>,
     pub processor_name: String,
     pub started: chrono::DateTime<chrono::Local>,
-    pub selected_process: Option<Box<ZProcess>>,
+    pub selected_process: Option<Box<MProcess>>,
     pub max_pid_len: usize,
     pub batteries: Vec<starship_battery::Battery>,
     pub uptime: Duration,
@@ -281,7 +278,7 @@ pub struct CPUTimeApp {
 }
 
 impl CPUTimeApp {
-    pub fn new(tick: Duration) -> CPUTimeApp {
+    pub fn new(_tick: Duration) -> CPUTimeApp { // TODO: remove the _ when using the variable (_ is there to avoid the warning)
         debug!("Create Histogram Map");
         // let histogram_map = HistogramMap::new(Duration::from_secs(60 * 60 * 24), tick, db);
         #[cfg(all(target_os = "linux", feature = "nvidia"))]
@@ -485,7 +482,7 @@ impl CPUTimeApp {
         }
     }
 
-    pub fn select_process(&mut self, highlighted_process: Option<Box<ZProcess>>) {
+    pub fn select_process(&mut self, highlighted_process: Option<Box<MProcess>>) {
         debug!("Selected Process.");
         self.selected_process = highlighted_process;
     }
@@ -552,12 +549,12 @@ impl CPUTimeApp {
                         .get_user_by_uid(process.uid)
                         .map(|user| user.name().to_string_lossy().to_string())
                         .unwrap_or(format!("{:}", process.uid));
-                    let zprocess = ZProcess::from_user_and_process(user_name, process);
-                    self.threads_total += zprocess.threads_total as usize;
+                    let mprocess = MProcess::from_user_and_process(user_name, process);
+                    self.threads_total += mprocess.threads_total as usize;
 
                     // top.update(zp, &self.histogram_map.tick);
 
-                    self.process_map.insert(zprocess.pid, zprocess);
+                    self.process_map.insert(mprocess.pid, mprocess);
                 }
             } else {
                 let user_name = self
@@ -566,15 +563,15 @@ impl CPUTimeApp {
                     .map(|user| user.name().to_string_lossy().to_string())
                     .unwrap_or(format!("{:}", process.uid));
                 #[allow(unused_mut)]
-                let mut zprocess = ZProcess::from_user_and_process(user_name, process);
+                let mut mprocess = MProcess::from_user_and_process(user_name, process);
                 // #[cfg(target_os = "linux")]
-                // zprocess.update_delay(client);
+                // mprocess.update_delay(client);
 
-                self.threads_total += zprocess.threads_total as usize;
+                self.threads_total += mprocess.threads_total as usize;
 
-                // top.update(&zprocess, &self.histogram_map.tick);
+                // top.update(&mprocess, &self.histogram_map.tick);
 
-                self.process_map.insert(zprocess.pid, zprocess);
+                self.process_map.insert(mprocess.pid, mprocess);
             }
             current_pids.insert(*pid);
         }
@@ -626,7 +623,7 @@ impl CPUTimeApp {
     pub fn sort_process_table(&mut self) {
         debug!("Sorting Process Table");
         let pm = &self.process_map;
-        let sorter = ZProcess::field_comparator(self.psortby);
+        let sorter = MProcess::field_comparator(self.psortby);
         let sortorder = &self.psortorder;
         // let tick = self.histogram_map.tick;
         let tick = Duration::from_millis(2000); // TODO: fix this

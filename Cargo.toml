@@ -1,5 +1,5 @@
 [package]
-name = "zenith"
+name = "el-modeer"
 version = "0.14.0"
 authors = ["Benjamin Vaisvil"]
 edition = "2018"

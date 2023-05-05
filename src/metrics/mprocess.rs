@@ -9,7 +9,7 @@ use libc::getpriority;
 use libc::{id_t, setpriority};
 
 #[cfg(target_os = "linux")]
-use linux_taskstats::Client;
+// use linux_taskstats::Client;
 
 use std::cmp::Ordering::{self, Equal};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -23,7 +23,7 @@ use chrono::Local;
 use crate::{convert_result_to_string, convert_error_to_string};
 
 #[derive(Clone)]
-pub struct ZProcess {
+pub struct MProcess {
     pub pid: i32,
     pub uid: u32,
     pub user_name: String,
@@ -57,10 +57,10 @@ pub struct ZProcess {
     pub et: DateTime<Local>, 
 }
 
-impl ZProcess {
+impl MProcess {
     pub fn from_user_and_process(user_name: String, process: &Process) -> Self {
         let disk_usage = process.disk_usage();
-        ZProcess {
+        MProcess {
             uid: process.uid,
             user_name,
             pid: process.pid(),
@@ -181,31 +181,31 @@ impl ZProcess {
         (self.swap_delay.as_secs_f64() / process_duration.as_secs_f64()) * 100.0
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn update_delay(&mut self, client: &Option<Client>) {
-        debug!("Getting Task Stats for {}", self.pid);
-        match client {
-            Some(c) => {
-                let stats_result = c.pid_stats(self.pid as u32);
-                match stats_result {
-                    Ok(s) => {
-                        self.prev_io_delay = self.io_delay;
-                        self.prev_swap_delay = self.swap_delay;
-                        self.io_delay = s.delays.blkio.delay_total;
-                        self.swap_delay = s.delays.swapin.delay_total;
-                        debug!(
-                            "Pid: {} io_delay: {} swap_delay: {}",
-                            self.pid,
-                            self.io_delay.as_secs(),
-                            self.swap_delay.as_secs()
-                        );
-                    }
-                    Err(_) => debug!("Couldn't get stats for {}", self.pid),
-                }
-            }
-            None => {}
-        }
-    }
+    // #[cfg(target_os = "linux")]
+    // pub fn update_delay(&mut self, client: &Option<Client>) {
+    //     debug!("Getting Task Stats for {}", self.pid);
+    //     match client {
+    //         Some(c) => {
+    //             let stats_result = c.pid_stats(self.pid as u32);
+    //             match stats_result {
+    //                 Ok(s) => {
+    //                     self.prev_io_delay = self.io_delay;
+    //                     self.prev_swap_delay = self.swap_delay;
+    //                     self.io_delay = s.delays.blkio.delay_total;
+    //                     self.swap_delay = s.delays.swapin.delay_total;
+    //                     debug!(
+    //                         "Pid: {} io_delay: {} swap_delay: {}",
+    //                         self.pid,
+    //                         self.io_delay.as_secs(),
+    //                         self.swap_delay.as_secs()
+    //                     );
+    //                 }
+    //                 Err(_) => debug!("Couldn't get stats for {}", self.pid),
+    //             }
+    //         }
+    //         None => {}
+    //     }
+    // }
 
     #[cfg(target_os = "linux")]
     pub fn set_priority(&mut self, priority: i32) -> String {

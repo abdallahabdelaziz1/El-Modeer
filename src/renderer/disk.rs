@@ -1,8 +1,5 @@
 // use super::style::{max_style, ok_style};
-// /**
-//  * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
-//  */
-// use super::{split_left_right_pane, FileSystemDisplay, Render, ZBackend};
+// use super::{split_left_right_pane, FileSystemDisplay, Render, MBackend};
 // use crate::float_to_byte_string;
 // use crate::metrics::histogram::{HistogramKind, View};
 // use crate::metrics::CPUTimeApp;
@@ -17,7 +14,7 @@
 // pub fn render_disk(
 //     app: &CPUTimeApp,
 //     layout: Rect,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     border_style: Style,
 //     file_system_index: &usize,
@@ -82,7 +79,7 @@
 // }
 // fn disk_activity_histogram(
 //     app: &CPUTimeApp,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     area: &[Rect],
 //     file_system_index: &usize,
@@ -196,7 +193,7 @@
 
 // fn disk_usage(
 //     app: &CPUTimeApp,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     area: &[Rect],
 //     file_system_index: &usize,

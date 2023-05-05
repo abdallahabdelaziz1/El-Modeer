@@ -7,7 +7,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use tui::Frame;
 
-use super::{FromPrimitive, Render, ZBackend};
+use super::{FromPrimitive, Render, MBackend};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -90,7 +90,7 @@ impl<'a> SectionMGRList<'a> {
     }
 }
 
-pub fn render_section_mgr(list: &mut SectionMGRList<'_>, area: Rect, f: &mut Frame<'_, ZBackend>) {
+pub fn render_section_mgr(list: &mut SectionMGRList<'_>, area: Rect, f: &mut Frame<'_, MBackend>) {
     // debug!("Rendering Section Manager");
 
     let layout = Layout::default()

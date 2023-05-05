@@ -1,9 +1,6 @@
-/**
- * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
- */
-use super::{percent_of, Render, ZBackend};
+use super::{percent_of, Render, MBackend};
 use crate::float_to_byte_string;
-use crate::metrics::zprocess::{ProcessStatusExt, ZProcess};
+use crate::metrics::mprocess::{ProcessStatusExt, MProcess};
 use crate::metrics::{CPUTimeApp, ProcessTableSortOrder};
 use byte_unit::{Byte, ByteUnit};
 use chrono::prelude::DateTime;
@@ -21,7 +18,7 @@ pub fn render_process_table(
     process_table: &[i32],
     area: Rect,
     process_table_start: usize,
-    f: &mut Frame<'_, ZBackend>,
+    f: &mut Frame<'_, MBackend>,
     border_style: Style,
     show_paths: bool,
     show_find: bool,
@@ -31,14 +28,14 @@ pub fn render_process_table(
     process_table_message: &String,
     highlighted_row: usize,
     freeze: bool,
-) -> Option<Box<ZProcess>> {
+) -> Option<Box<MProcess>> {
     // 4 for the margins and table header
     let display_height = match area.height.saturating_sub(4) {
         0 => return None,
         v => v as usize,
     };
 
-    let procs: Vec<&ZProcess> = process_table
+    let procs: Vec<&MProcess> = process_table
         .iter()
         .map(|pid| {
             app.process_map
@@ -261,7 +258,7 @@ pub fn render_process_table(
         .render(f, area);
 
 
-    let mut frozen_text = vec![Spans::from(vec![
+    let frozen_text = vec![Spans::from(vec![
             Span::styled("  FROZEN  ", Style::default().fg(Color::White).bg(Color::Blue).add_modifier(Modifier::BOLD)),
         ])];
         
@@ -278,10 +275,10 @@ pub fn render_process_table(
 pub fn render_process(
     app: &CPUTimeApp,
     layout: Rect,
-    f: &mut Frame<'_, ZBackend>,
+    f: &mut Frame<'_, MBackend>,
     border_style: Style,
     process_message: &Option<String>,
-    p: &ZProcess,
+    p: &MProcess,
     freeze: bool
 ) {
     Block::default()
@@ -425,7 +422,7 @@ pub fn render_process(
         ]),
     ];
 
-    let mut frozen_text = vec![Spans::from(vec![
+    let frozen_text = vec![Spans::from(vec![
         Span::styled("  FROZEN  ", Style::default().fg(Color::White).bg(Color::Blue).add_modifier(Modifier::BOLD)),
     ])];
 

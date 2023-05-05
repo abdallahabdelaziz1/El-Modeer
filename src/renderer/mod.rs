@@ -1,6 +1,3 @@
-/**
- * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
- */
 mod cpu;
 mod system_info;
 mod disk;
@@ -15,7 +12,7 @@ pub mod style;
 mod title;
 // use crate::metrics::graphics::device::GraphicsExt;
 // use crate::metrics::histogram::View;
-use crate::metrics::zprocess::*;
+use crate::metrics::mprocess::*;
 use crate::metrics::*;
 use crate::renderer::section::{sum_section_heights, Section, SectionMGRList};
 use crate::renderer::column::{Column, ColumnMGRList};
@@ -30,22 +27,22 @@ use num_traits::FromPrimitive;
 // use std::cmp::Eq;
 use std::io;
 use std::io::Stdout;
-use std::path::PathBuf;
+// use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tui::{backend::CrosstermBackend, Terminal};
 
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders};
+use tui::style::{Style};
+// use tui::widgets::{Block, Borders};
 use tui::Frame;
 use heim::process as hproc;
 use heim::process::ProcessError;
 
 const PROCESS_SELECTION_GRACE: Duration = Duration::from_millis(2000);
-const LEFT_PANE_WIDTH: u16 = 34u16;
+// const LEFT_PANE_WIDTH: u16 = 34u16;
 
-type ZBackend = CrosstermBackend<Stdout>;
+type MBackend = CrosstermBackend<Stdout>;
 
 /// Compatibility trait, that preserves an older method from tui 0.6.5
 /// Exists mostly to keep the caller code idiomatic for the use cases in this file
@@ -88,7 +85,7 @@ macro_rules! update_section_height {
 // fn split_left_right_pane(
 //     title: &str,
 //     area: Rect,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     border_style: Style,
 // ) -> (Vec<Rect>, View) {
@@ -244,7 +241,7 @@ impl<'a> TerminalRenderer<'_> {
         // disable_history: bool,
     ) -> TerminalRenderer {
         // debug!("Create Metrics App");
-        let mut app = CPUTimeApp::new(Duration::from_millis(tick_rate));
+        let app = CPUTimeApp::new(Duration::from_millis(tick_rate));
         // debug!("Create Event Loop");
         // let events = Events::new(app.histogram_map.tick);
         let events = Events::new(Duration::from_millis(tick_rate));
@@ -259,8 +256,8 @@ impl<'a> TerminalRenderer<'_> {
         terminal.hide_cursor().ok();
 
         let constraints = get_constraints(section_geometry, terminal_size().1);
-        let mut section_geometry = section_geometry.to_vec();
-        let mut recompute_constraints_on_start_up = false;
+        let section_geometry = section_geometry.to_vec();
+        let recompute_constraints_on_start_up = false;
         let default_cols = vec![
             Column::PID, 
             Column::PPID, 
@@ -369,7 +366,7 @@ impl<'a> TerminalRenderer<'_> {
             let pst = &self.process_table_row_start;
             let mut width: u16 = 0;
             let mut process_table_height: u16 = 0;
-            let zf = &self.zoom_factor;
+            // let zf = &self.zoom_factor;
             let constraints = &self.constraints;
             let geometry = &self.section_geometry.to_vec();
             let section_manager_options = &mut self.section_manager_options;
@@ -378,7 +375,7 @@ impl<'a> TerminalRenderer<'_> {
             let process_message = &self.process_message;
             let process_table_message = &self.process_table_message;
             // let offset = &self.hist_start_offset;
-            let un = &self.update_number;
+            // let un = &self.update_number;
             let show_help = self.show_help;
             let show_section_mgr = self.show_section_mgr;
             let show_column_mgr = self.show_column_mgr;
@@ -388,7 +385,7 @@ impl<'a> TerminalRenderer<'_> {
             let show_find = self.show_find;
             let show_kill = self.show_kill;
             let kill_pid = &self.kill_pid;
-            let mut highlighted_process: Option<Box<ZProcess>> = None;
+            let mut highlighted_process: Option<Box<MProcess>> = None;
             let process_table = process::filter_process_table(app, &self.filter);
             // let gfx_device_index = &self.gfx_device_index;
             // let file_system_index = &self.file_system_index;
@@ -595,7 +592,7 @@ impl<'a> TerminalRenderer<'_> {
         input: KeyEvent,
         process_table: &[i32],
         process_table_height: u16,
-        highlighted_process: Option<Box<ZProcess>>,
+        highlighted_process: Option<Box<MProcess>>,
     ) -> Action {
       //  debug!("Event Key: {:?}", input);
         match input.code {
@@ -653,7 +650,7 @@ impl<'a> TerminalRenderer<'_> {
         Action::Continue
     }
 
-    fn select(&mut self, highlighted_process: Option<Box<ZProcess>>) {
+    fn select(&mut self, highlighted_process: Option<Box<MProcess>>) {
         let selected = self.selected_section();
         if selected == Section::Process {
             self.app.select_process(highlighted_process);
@@ -1070,7 +1067,7 @@ enum Action {
 }
 
 pub enum HistoryRecording {
-    On,
+    // On,
     UserDisabled,
-    OtherInstancePrevents,
+    // OtherInstancePrevents,
 }

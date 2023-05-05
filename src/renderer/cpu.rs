@@ -5,7 +5,7 @@
 // use crate::float_to_byte_string;
 // use crate::metrics::histogram::{HistogramKind, View};
 // use crate::metrics::CPUTimeApp;
-// use crate::renderer::{percent_of, split_left_right_pane, Render, ZBackend};
+// use crate::renderer::{percent_of, split_left_right_pane, Render, MBackend};
 // use byte_unit::{Byte, ByteUnit};
 // use tui::layout::{Constraint, Direction, Layout, Rect};
 // use tui::style::{Color, Modifier, Style};
@@ -113,7 +113,7 @@
 //     ])
 // }
 
-// fn render_cpu_histogram(app: &CPUTimeApp, area: Rect, f: &mut Frame<'_, ZBackend>, view: &View) {
+// fn render_cpu_histogram(app: &CPUTimeApp, area: Rect, f: &mut Frame<'_, MBackend>, view: &View) {
 //     let h = match app.histogram_map.get_zoomed(&HistogramKind::Cpu, view) {
 //         Some(h) => h,
 //         None => return,
@@ -127,7 +127,7 @@
 //         .render(f, area);
 // }
 
-// fn render_memory_histogram(app: &CPUTimeApp, area: Rect, f: &mut Frame<'_, ZBackend>, view: &View) {
+// fn render_memory_histogram(app: &CPUTimeApp, area: Rect, f: &mut Frame<'_, MBackend>, view: &View) {
 //     let h = match app.histogram_map.get_zoomed(&HistogramKind::Mem, view) {
 //         Some(h) => h,
 //         None => return,
@@ -141,7 +141,7 @@
 //         .render(f, area);
 // }
 
-// fn render_cpu_bars(app: &CPUTimeApp, area: Rect, f: &mut Frame<'_, ZBackend>, style: &Style) {
+// fn render_cpu_bars(app: &CPUTimeApp, area: Rect, f: &mut Frame<'_, MBackend>, style: &Style) {
 //     let cpus = app.cpus.to_owned();
 //     if cpus.is_empty() {
 //         return;
@@ -269,7 +269,7 @@
 // pub fn render_cpu(
 //     app: &CPUTimeApp,
 //     area: Rect,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     border_style: Style,
 // ) {

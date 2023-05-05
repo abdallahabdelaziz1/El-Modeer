@@ -1,7 +1,4 @@
-// /**
-//  * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
-//  */
-// use super::{split_left_right_pane, Render, ZBackend};
+// use super::{split_left_right_pane, Render, MBackend};
 // use crate::float_to_byte_string;
 // use crate::metrics::histogram::{HistogramKind, View};
 // use crate::metrics::CPUTimeApp;
@@ -16,7 +13,7 @@
 // pub fn render_net(
 //     app: &CPUTimeApp,
 //     area: Rect,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     border_style: Style,
 // ) {

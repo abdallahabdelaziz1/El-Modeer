@@ -1,7 +1,3 @@
-/**
- * Copyright 2019-2020, Benjamin Vaisvil and the zenith contributors
- */
-
 #[macro_use]
 extern crate num_derive;
 #[macro_use]
@@ -160,7 +156,7 @@ fn create_geometry(
     geometry
 }
 
-fn start_zenith(
+fn start_elmodeer(
     rate: u64,
     system_info_height: u16,
     process_height: u16,
@@ -296,7 +292,7 @@ fn validate_refresh_rate(arg: &str) -> Result<u64, String> {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = std::env::args().collect::<Vec<_>>();
     let opts =
-        ZOptions::parse_args_default(&args[1..]).map_err(|e| format!("{}: {}", args[0], e))?;
+        MOptions::parse_args_default(&args[1..]).map_err(|e| format!("{}: {}", args[0], e))?;
 
     // TODO: Add help description.
     if opts.help_requested() {
@@ -314,11 +310,11 @@ Usage: {} [OPTIONS]
 ",
             env!("CARGO_PKG_VERSION"),
             args[0],
-            ZOptions::usage()
+            MOptions::usage()
         );
         return Ok(());
     } else if opts.version {
-        println!("zenith {}", env!("CARGO_PKG_VERSION"));
+        println!("el-modeer {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
 
@@ -335,9 +331,9 @@ Usage: {} [OPTIONS]
     // };
 
     // env_logger::init();
-    // info!("Starting zenith {}", env!("CARGO_PKG_VERSION"));
+    // info!("Starting El-Modeer {}", env!("CARGO_PKG_VERSION"));
 
-    start_zenith(
+    start_elmodeer(
         opts.refresh_rate,
         opts.system_info_height, 
         opts.process_height,
@@ -351,7 +347,7 @@ Usage: {} [OPTIONS]
 }
 
 #[derive(Options)]
-struct ZOptions {
+struct MOptions {
     /// Disables history when flag is present
     // #[options(no_short, long = "disable-history", default = "false")]
     // disable_history: bool,

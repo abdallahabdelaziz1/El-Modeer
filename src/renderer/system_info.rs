@@ -1,4 +1,4 @@
-use super::{Render, ZBackend};
+use super::{Render, MBackend};
 use crate::metrics::*;
 use tui::layout::Rect;
 use tui::style::{Color, Modifier, Style};
@@ -12,7 +12,7 @@ use crate::util::to_gb;
 pub fn render_system_info(
     app: &CPUTimeApp,
     area: Rect,
-    f: &mut Frame<'_, ZBackend>,
+    f: &mut Frame<'_, MBackend>,
     border_style: Style,
     // zf: &u32,
     // offset: &usize,
@@ -72,6 +72,6 @@ pub fn render_system_info(
             .borders(Borders::ALL)
             .border_style(border_style)
             .title(Span::styled("System Info", border_style)))
-        .style(Style::default().fg(Color::White).bg(Color::Black))
+        .style(Style::default())
         .wrap(Wrap { trim: true }).render(f, area);
 }

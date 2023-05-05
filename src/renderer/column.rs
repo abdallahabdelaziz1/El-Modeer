@@ -4,7 +4,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use tui::Frame;
 
-use super::{FromPrimitive, Render, ZBackend};
+use super::{FromPrimitive, Render, MBackend};
 use std::fmt;
 
 #[derive(FromPrimitive, PartialEq, Copy, Clone, Debug, Ord, PartialOrd, Eq)]
@@ -75,7 +75,7 @@ impl<'a> ColumnMGRList<'a> {
     }
 }
 
-pub fn render_column_mgr(list: &mut ColumnMGRList<'_>, area: Rect, f: &mut Frame<'_, ZBackend>) {
+pub fn render_column_mgr(list: &mut ColumnMGRList<'_>, area: Rect, f: &mut Frame<'_, MBackend>) {
     let layout = Layout::default()
         .margin(5)
         .direction(Direction::Vertical)

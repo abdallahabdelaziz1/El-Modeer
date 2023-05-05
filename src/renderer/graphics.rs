@@ -2,7 +2,7 @@
 // /**
 //  * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
 //  */
-// use super::{percent_of, Render, ZBackend, LEFT_PANE_WIDTH};
+// use super::{percent_of, Render, MBackend, LEFT_PANE_WIDTH};
 // use crate::float_to_byte_string;
 // use crate::metrics::histogram::{HistogramKind, View};
 // use crate::metrics::CPUTimeApp;
@@ -17,7 +17,7 @@
 // pub fn render_graphics(
 //     app: &CPUTimeApp,
 //     layout: Rect,
-//     f: &mut Frame<'_, ZBackend>,
+//     f: &mut Frame<'_, MBackend>,
 //     view: View,
 //     gfx_device_index: &usize,
 //     border_style: Style,

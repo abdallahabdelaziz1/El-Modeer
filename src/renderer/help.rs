@@ -2,7 +2,7 @@
  * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
  */
 use crate::metrics::*;
-use crate::renderer::{HistoryRecording, Render, ZBackend};
+use crate::renderer::{HistoryRecording, Render, MBackend};
 #[cfg(all(target_os = "linux", feature = "nvidia"))]
 use nvml::error::NvmlError;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
@@ -14,7 +14,7 @@ use tui::Frame;
 pub fn render_help(
     _app: &CPUTimeApp,
     area: Rect,
-    f: &mut Frame<'_, ZBackend>,
+    f: &mut Frame<'_, MBackend>,
     history_recording: HistoryRecording,
 ) {
     let header_style = Style::default().fg(Color::Green);
@@ -78,13 +78,13 @@ pub fn render_help(
     }
 
     let not_recording_reason = match history_recording {
-        HistoryRecording::On => None,
+        // HistoryRecording::On => None,
         HistoryRecording::UserDisabled => {
             Some("because zenith was started with the `--disable_history` flag\n")
         }
-        HistoryRecording::OtherInstancePrevents => {
-            Some("because another zenith instance was already running\n")
-        }
+        // HistoryRecording::OtherInstancePrevents => {
+        //     Some("because another zenith instance was already running\n")
+        // }
     };
 
     if let Some(reason) = not_recording_reason {
