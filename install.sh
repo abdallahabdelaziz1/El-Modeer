@@ -27,8 +27,6 @@ if cargo install --path .; then
 
     exec bash
 
-    rm ~/.bash_aliases
 else
     echo "An error occured"
-
 fi
