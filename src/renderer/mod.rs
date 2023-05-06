@@ -1168,12 +1168,12 @@ impl<'a> TerminalRenderer<'_> {
             Key::F(1) | Key::Char('i') => {
                 self.toggle_section_mgr();
             }
-            Key::Char('m') => {
-                self.update_section_height(-2).await;
-            }
-            Key::Char('e') => {
-                self.update_section_height(2).await;
-            }
+            // Key::Char('m') => {
+            //     self.update_section_height(-2).await;
+            // }
+            // Key::Char('e') => {
+            //     self.update_section_height(2).await;
+            // }
             Key::Char('`') => {
                 self.zoom_factor = 1;
               //  self.hist_start_offset = 0;

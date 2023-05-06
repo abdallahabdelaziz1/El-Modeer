@@ -305,12 +305,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // TODO: Add help description.
     if opts.help_requested() {
         println!(
-            "zenith {}
-Benjamin Vaisvil <ben@neuon.com>
-Zenith, sort of like top but with histograms.
+            "El-Modeer {}
+Abdallah Abdelaziz <abdallah_taha@aucegypt>, 
+Amer Elsheikh <amer.elsheikh@aucegypt>, 
+Gehad Fekry <gehadsalemfekry@aucegypt>.
+El-Modeer, sort of like top but in rust.
 Up/down arrow keys move around the process table. Return (enter) will focus on a process.
-Tab switches the active section. Active sections can be expanded (e) and minimized (m).
-Using this you can create the layout you want.
 
 Usage: {} [OPTIONS]
 
