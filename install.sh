@@ -8,6 +8,14 @@ if cargo install --path .; then
 
     echo "El-modeer is installed Successfully!"
 
+    # copy tree to ~/home/el-modeer
+    if [ ! -d "~/el-modeer/" ] 
+    then
+        mkdir ~/el-modeer;
+    fi
+
+    cp ./tree/modeer ~/el-modeer
+
     # define the alias and command
     alias_name="deer"
     alias_command="el-modeer"
