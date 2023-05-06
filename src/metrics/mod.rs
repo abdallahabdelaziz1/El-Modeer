@@ -1,6 +1,7 @@
 pub mod mprocess;
 
 use crate::metrics::mprocess::MProcess;
+use crate::renderer::column::Column;
 use crate::util::percent_of;
 
 use heim::host;
@@ -19,22 +20,23 @@ use sysinfo::{
 };
 use users::{Users, UsersCache};
 
-#[derive(FromPrimitive, PartialEq, Copy, Clone)]
-pub enum ProcessTableSortBy { 
-    Pid = 0,
-    User = 1,
-    Priority = 2,
-    Nice = 3,
-    Cpu = 4,
-    MemPerc = 5,
-    Mem = 6,
-    Virt = 7,
-    Status = 8,
-    DiskRead = 9,
-    DiskWrite = 10,
-    IOWait = 11,
-    Cmd = 12,
-}
+// #[derive(FromPrimitive, PartialEq, Copy, Clone)]
+// pub enum Column { 
+//     PID = 0,
+//     PPID = 1,
+//     User = 2,
+//     Priority = 3,
+//     Nice = 4,
+//     Status = 5,
+//     TTY = 6,
+//     CPUPercentage = 7,
+//     MemoryPercentage = 8,
+//     Memory = 9,
+//     VirtualMemory = 10,
+//     CPUTime = 11,
+//     StartTime = 12,
+//     CMD = 13,
+// }
 
 #[derive(PartialEq, Eq)]
 pub enum ProcessTableSortOrder {
@@ -144,7 +146,7 @@ pub struct CPUTimeApp {
     pub zombie_processes: u64,
     pub processes: Vec<i32>,
     pub process_map: HashMap<i32, MProcess>,
-    pub psortby: ProcessTableSortBy,
+    pub psortby: Column,
     pub psortorder: ProcessTableSortOrder,
     // pub disks: HashMap<String, ZDisk>,
     pub disk_write: u64,
@@ -201,7 +203,7 @@ impl CPUTimeApp {
             threads_total: 0,
             disk_read: 0,
             disk_write: 0,
-            psortby: ProcessTableSortBy::Cpu,
+            psortby: Column::CPUPercentage,
             psortorder: ProcessTableSortOrder::Descending,
             osname: String::from(""),
             release: String::from(""),
@@ -217,8 +219,6 @@ impl CPUTimeApp {
             top_pids: Top::default(),
             uptime: Duration::from_secs(0),
             tick: tick,
-            //gfx_devices: vec![],
-
         };
         s.system.refresh_all();
         s.system.refresh_all(); // apparently multiple refreshes are necessary to fill in all values.

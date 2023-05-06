@@ -224,15 +224,17 @@ impl<'a> TerminalRenderer<'_> {
         let constraints = get_constraints(section_geometry, terminal_size().1);
         let section_geometry = section_geometry.to_vec();
         let recompute_constraints_on_start_up = false;
-        let default_cols = vec![
+        let mut default_cols = vec![
             Column::PID, 
             Column::PPID, 
             Column::TTY, 
+            Column::Nice,
             Column::Status, 
             Column::User, 
-            Column::CPUTime, 
-            Column::StartTime
+            Column::CPUPercentage, 
+            Column::CMD
         ];
+        default_cols.sort();
 
         // app.update_gfx_devices();
         // if app.gfx_devices.is_empty() {
@@ -339,6 +341,7 @@ impl<'a> TerminalRenderer<'_> {
             let pst = &self.process_table_row_start;
             let mut width: u16 = 0;
             let mut process_table_height: u16 = 0;
+            let proc_columns = &self.proc_columns;
             // let zf = &self.zoom_factor;
             let constraints = &self.constraints;
             let geometry = &self.section_geometry.to_vec();
@@ -441,29 +444,6 @@ impl<'a> TerminalRenderer<'_> {
                                         border_style,
                                     );
                                 }
-                                // Section::Cpu => {
-                                //     cpu::render_cpu(app, v_section, f, view, border_style)
-                                // }
-                                // Section::Network => {
-                                //     network::render_net(app, v_section, f, view, border_style)
-                                // }
-                                // Section::Disk => disk::render_disk(
-                                //     app,
-                                //     v_section,
-                                //     f,
-                                //     view,
-                                //     border_style,
-                                //     file_system_index,
-                                //     file_system_display,
-                                // ),
-                                // Section::Graphics => graphics::render_graphics(
-                                //     app,
-                                //     v_section,
-                                //     f,
-                                //     view,
-                                //     gfx_device_index,
-                                //     border_style,
-                                // ),
                                 Section::Process => {
                                     if let Some(p) = app.selected_process.as_ref() {
                                         process::render_process(
@@ -484,6 +464,7 @@ impl<'a> TerminalRenderer<'_> {
                                             v_section,
                                             *pst,
                                             f,
+                                            proc_columns,
                                             border_style,
                                             show_paths,
                                             show_find,
@@ -1114,28 +1095,72 @@ impl<'a> TerminalRenderer<'_> {
         self.show_column_mgr = !self.show_column_mgr;
     }
 
+    // select the next column after the self.app.psortby colum that exists in proc_column
+    fn sort_by_next_column(&mut self) {
+        if self.proc_columns.len() == 1 {
+            return;
+        }
+        
+        // make sure that the vector is not one column and circular reference   
+        let mut next_column = self.app.psortby;
+        let mut found = false;
+        // let column_size = self.proc_columns.len() as u32;
+        while !found {
+            next_column = FromPrimitive::from_u32((next_column as u32 + 1) % 14) // TODO: Add num of cols
+                .expect("invalid value to set psortby");
+            if self.proc_columns.contains(&next_column) {
+                found = true;
+            }
+        }
+        self.app.psortby = next_column;
+        self.app.sort_process_table();
+    }
+
+    fn sort_by_prev_column(&mut self) {
+        if self.proc_columns.len() == 1 {
+            return;
+        }
+        
+        // make sure that the vector is not one column and circular reference   
+        let mut prev_column = self.app.psortby;
+        let mut found = false;
+        // let column_size = self.proc_columns.len() as u32;
+        while !found {
+            prev_column = FromPrimitive::from_u32(((prev_column as i32 - 1 + 14) % 14) as u32) // TODO: Add num of cols
+                .expect("invalid value to set psortby");
+            if self.proc_columns.contains(&prev_column) {
+                found = true;
+            }
+        }
+        self.app.psortby = prev_column;
+        self.app.sort_process_table();
+    }
+  
+
+
     async fn process_toplevel_input(&mut self, input: KeyEvent) -> Action {
         match input.code {
             Key::Char('q') => {
                 return Action::Quit;
             }
             Key::Char('.') | Key::Char('>') => {
-                if self.app.psortby == ProcessTableSortBy::Cmd {
-                    self.app.psortby = ProcessTableSortBy::Pid;
-                } else {
-                    self.app.psortby = FromPrimitive::from_u32(self.app.psortby as u32 + 1)
-                        .expect("invalid value to set psortby");
-                }
-                self.app.sort_process_table();
+                self.sort_by_next_column();
+                // if self.app.psortby == ProcessTableSortBy::Cmd {
+                //     self.app.psortby = ProcessTableSortBy::Pid;
+                // } else {
+                //     self.app.psortby = FromPrimitive::from_u32(self.app.psortby as u32 + 1)
+                //         .expect("invalid value to set psortby");
+                // }
             }
             Key::Char(',') | Key::Char('<') => {
-                if self.app.psortby == ProcessTableSortBy::Pid {
-                    self.app.psortby = ProcessTableSortBy::Cmd;
-                } else {
-                    self.app.psortby = FromPrimitive::from_u32(self.app.psortby as u32 - 1)
-                        .expect("invalid value to set psortby");
-                }
-                self.app.sort_process_table();
+                self.sort_by_prev_column();
+                // if self.app.psortby == ProcessTableSortBy::Pid {
+                //     self.app.psortby = ProcessTableSortBy::Cmd;
+                // } else {
+                //     self.app.psortby = FromPrimitive::from_u32(self.app.psortby as u32 - 1)
+                //         .expect("invalid value to set psortby");
+                // }
+                // self.app.sort_process_table();
             }
             Key::Char(';') => {
                 match self.app.psortorder {

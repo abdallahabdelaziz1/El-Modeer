@@ -11,13 +11,18 @@ use std::fmt;
 pub enum Column {
     PID = 0,
     PPID = 1,
-    TTY = 2,
-    Status = 3,
-    User = 4,
-    CPUTime = 5,
-    StartTime = 6,
-    Nice = 7,
-    CMD = 8,
+    User = 2,
+    Priority = 3,
+    Nice = 4,
+    Status = 5,
+    TTY = 6,
+    CPUPercentage = 7,
+    MemoryPercentage = 8,
+    Memory = 9,
+    VirtualMemory = 10,
+    CPUTime = 11,
+    StartTime = 12,
+    CMD = 13,
 }
 
 impl fmt::Display for Column {
@@ -25,13 +30,18 @@ impl fmt::Display for Column {
         let name = match self {
             Column::PID => " PID",
             Column::PPID => " PPID",   
-            Column::TTY => " TTY",
-            Column::Status => " Status",
             Column::User => " User",
-            Column::CPUTime => " CPU Time",
-            Column::CMD => " CMD",
-            Column::StartTime => " Start Time",
+            Column::Priority => " Priority",
             Column::Nice => " Nice",
+            Column::Status => " Status",
+            Column::TTY => " TTY",
+            Column::CPUPercentage => " CPU Percentage",
+            Column::MemoryPercentage => " Memory Percentage",
+            Column::Memory => " Memory",
+            Column::VirtualMemory => " Virtual Memory",
+            Column::CPUTime => " CPU Time",
+            Column::StartTime => " Start Time",
+            Column::CMD => " CMD / Command Name",
         };
         write!(f, "{}", name)
     }
@@ -45,7 +55,7 @@ pub struct ColumnMGRList<'a> {
 impl<'a> ColumnMGRList<'a> {
     pub fn with_cols(cols: Vec<Column>) -> ColumnMGRList<'a> {
         let mut state = ListState::default();
-        let items: Vec<(Column, ListItem)> = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        let items: Vec<(Column, ListItem)> = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
             .iter()
             .map(|i| {
                 let column: Column = FromPrimitive::from_u32(*i as u32)

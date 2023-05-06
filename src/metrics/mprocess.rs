@@ -1,7 +1,8 @@
 /**
  * Copyright 2019-2020, Benjamin Vaisvil and the zenith contributors
  */
-use crate::metrics::ProcessTableSortBy;
+// use crate::metrics::Column;
+use crate::renderer::column::Column;
 use heim::process;
 use heim::process::ProcessError;
 #[cfg(target_os = "linux")]
@@ -13,6 +14,8 @@ use libc::{id_t, setpriority};
 
 use std::cmp::Ordering::{self, Equal};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::path::{PathBuf};
+use std::fs::read_link;
 use sysinfo::Process;
 use sysinfo::ProcessExt;
 use sysinfo::ProcessStatus;
@@ -22,11 +25,46 @@ use chrono::Duration as CDuration;
 use chrono::Local;
 use crate::{convert_result_to_string, convert_error_to_string};
 
+
+// pub fn get_tty(process: &sysinfo::Process) -> Option<String> {
+//     let pid = process.pid();
+//     let tty_path = format!("/proc/{}/fd/0", pid);
+//     let path = PathBuf::from(&tty_path);
+
+//     if let Ok(target) = read_link(&path) {
+//         if let Some(tty_os_str) = target.file_name() {
+//             return Some(tty_os_str.to_string_lossy().into_owned());
+//         }
+//     }
+//     None
+// }
+
+pub fn get_tty(process: &sysinfo::Process) -> String {
+    let pid = process.pid();
+    let tty_path = format!("/proc/{}/fd/0", pid);
+    let path = PathBuf::from(&tty_path);
+
+    if let Ok(target) = read_link(&path) {
+        if let Some(tty_os_str) = target.file_name() {
+            let tty_string = tty_os_str.to_string_lossy().into_owned();
+            if tty_string.chars().all(|c| c.is_digit(10)) {
+                return "pts/".to_string() + tty_string.as_str();
+            } else {
+                return "pts/0".to_string();
+            }
+        }
+    }
+
+    "?".to_string()
+}
+
 #[derive(Clone)]
 pub struct MProcess {
     pub pid: i32,
+    pub ppid: i32,
     pub uid: u32,
     pub user_name: String,
+    pub tty: String,
     pub memory: u64,
     pub cpu_usage: f32,
     pub cum_cpu_usage: f64,
@@ -45,6 +83,7 @@ pub struct MProcess {
     pub last_updated: SystemTime,
     pub end_time: Option<u64>,
     pub start_time: u64,
+    pub cpu_time: u64,
     pub gpu_usage: u64,
     pub fb_utilization: u64,
     pub enc_utilization: u64,
@@ -64,6 +103,8 @@ impl MProcess {
             uid: process.uid,
             user_name,
             pid: process.pid(),
+            ppid: process.parent().unwrap_or_else(|| 1), // if you can't get the parent, it's init
+            tty: get_tty(process), // TODO: get tty
             memory: process.memory(),
             cpu_usage: process.cpu_usage(),
             command: process.cmd().to_vec(),
@@ -82,6 +123,7 @@ impl MProcess {
             last_updated: SystemTime::now(),
             end_time: None,
             start_time: process.start_time(),
+            cpu_time: process.cpu_time(),
             gpu_usage: 0,
             fb_utilization: 0,
             enc_utilization: 0,
@@ -101,6 +143,9 @@ impl MProcess {
         (self.write_bytes - self.prev_write_bytes) as f64 / tick_rate.as_secs_f64()
     }
 
+
+    
+    
     pub async fn suspend(&self) -> String {
         match process::get(self.pid).await {
             Ok(p) => convert_result_to_string!(p.suspend().await),
@@ -199,38 +244,28 @@ impl MProcess {
 
     /// returns a pointer to a comparator function, not a closure
     pub fn field_comparator(
-        sortfield: ProcessTableSortBy,
+        sortfield: Column,
     ) -> fn(&Self, &Self, &Duration) -> Ordering {
         match sortfield {
-            ProcessTableSortBy::Cpu => {
+            Column::CPUPercentage => {
                 |pa, pb, _tick| pa.cpu_usage.partial_cmp(&pb.cpu_usage).unwrap_or(Equal)
             }
-            ProcessTableSortBy::Mem => |pa, pb, _tick| pa.memory.cmp(&pb.memory),
-            ProcessTableSortBy::MemPerc => |pa, pb, _tick| pa.memory.cmp(&pb.memory),
-            ProcessTableSortBy::User => |pa, pb, _tick| pa.user_name.cmp(&pb.user_name),
-            ProcessTableSortBy::Pid => |pa, pb, _tick| pa.pid.cmp(&pb.pid),
-            ProcessTableSortBy::Status => {
+            Column::Memory => |pa, pb, _tick| pa.memory.cmp(&pb.memory),
+            Column::MemoryPercentage => |pa, pb, _tick| pa.memory.cmp(&pb.memory),
+            Column::User => |pa, pb, _tick| pa.user_name.cmp(&pb.user_name),
+            Column::TTY => |pa, pb, _tick| pa.tty.partial_cmp(&pb.tty).unwrap_or(Equal),
+            Column::PID => |pa, pb, _tick| pa.pid.cmp(&pb.pid),
+            Column::PPID => |pa, pb, _tick| pa.ppid.cmp(&pb.ppid),
+            Column::Status => {
                 |pa, pb, _tick| pa.status.to_single_char().cmp(pb.status.to_single_char())
             }
-            ProcessTableSortBy::Priority => |pa, pb, _tick| pa.priority.cmp(&pb.priority),
-            ProcessTableSortBy::Nice => {
-                |pa, pb, _tick| pa.priority.partial_cmp(&pb.nice).unwrap_or(Equal)
-            }
-            ProcessTableSortBy::Virt => |pa, pb, _tick| pa.virtual_memory.cmp(&pb.virtual_memory),
-            ProcessTableSortBy::Cmd => |pa, pb, _tick| pa.name.cmp(&pb.name),
-            ProcessTableSortBy::DiskRead => |pa, pb, tick| {
-                pa.get_read_bytes_sec(tick)
-                    .partial_cmp(&pb.get_read_bytes_sec(tick))
-                    .unwrap_or(Equal)
-            },
-            ProcessTableSortBy::DiskWrite => |pa, pb, tick| {
-                pa.get_write_bytes_sec(tick)
-                    .partial_cmp(&pb.get_write_bytes_sec(tick))
-                    .unwrap_or(Equal)
-            },
-            ProcessTableSortBy::IOWait => |pa, pb, _tick| {
-                (pa.io_delay - pa.prev_io_delay).cmp(&(pb.io_delay - pb.prev_io_delay))
-            },
+            Column::Priority => |pa, pb, _tick| pa.priority.cmp(&pb.priority),
+            Column::Nice => |pa, pb, _tick| pa.nice.cmp(&pb.nice),
+            
+            Column::VirtualMemory => |pa, pb, _tick| pa.virtual_memory.cmp(&pb.virtual_memory),
+            Column::CPUTime => |pa, pb, _tick| pa.cpu_time.cmp(&pb.cpu_time),
+            Column::StartTime => |pa, pb, _tick| pa.start_time.cmp(&pb.start_time),
+            Column::CMD => |pa, pb, _tick| pa.name.cmp(&pb.name),
         }
     }
 }
