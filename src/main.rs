@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate num_derive;
-#[macro_use]
-extern crate log;
 
 mod constants;
 mod metrics;
@@ -11,6 +9,7 @@ mod util;
 use crate::renderer::section::{sum_section_heights, Section};
 use crate::renderer::TerminalRenderer;
 use gumdrop::Options;
+
 
 use crossterm::{
     cursor, execute,
@@ -27,9 +26,13 @@ use std::io::stdout;
 // use std::panic;
 // use std::panic::PanicInfo;
 // use std::path::Path;
-use std::process::exit;
 // use std::time::Duration;
 // use std::time::SystemTime;
+use std::process::{Command,exit};
+use std::path::PathBuf;
+use dirs;
+use execute::Execute;
+
 
 // fn panic_hook(info: &PanicInfo<'_>) {
 //     let location = info.location().unwrap(); // The current implementation always returns Some
@@ -46,7 +49,6 @@ use std::process::exit;
 // }
 
 fn init_terminal() {
-    debug!("Initializing Terminal");
     let mut sout = stdout();
     execute!(sout, EnterAlternateScreen).expect("Unable to enter alternate screen");
     execute!(sout, cursor::Hide).expect("Unable to hide cursor");
@@ -55,7 +57,6 @@ fn init_terminal() {
 }
 
 fn restore_terminal() {
-    debug!("Restoring Terminal");
     let mut sout = stdout();
     // Restore cursor position and clear screen for TTYs
     execute!(sout, cursor::MoveTo(0, 0)).expect("Attempt to write to alternate screen failed.");
@@ -280,29 +281,36 @@ fn validate_refresh_rate(arg: &str) -> Result<u64, String> {
     }
 }
 
-// fn default_db_path() -> String {
-//     dirs_next::cache_dir()
-//         .unwrap_or_else(|| Path::new("./").to_owned())
-//         .join("zenith")
-//         .to_str()
-//         .expect("Couldn't set default db path")
-//         .to_string()
-// }
-
 fn main() -> Result<(), Box<dyn Error>> {
+   
     let args = std::env::args().collect::<Vec<_>>();
     let opts =
         MOptions::parse_args_default(&args[1..]).map_err(|e| format!("{}: {}", args[0], e))?;
+    
+    if opts.tree == true {
+        let mut home_dir = dirs::home_dir().expect("Failed to get home directory");
+        home_dir.push("el-modeer/modeer");
+        let home_dir_str = home_dir.to_string_lossy().to_string();
+        // println!("Home directory with Modeer: {}", home_dir_str);
+        let mut tree_command = Command::new(&home_dir_str);
+
+        if tree_command.execute_check_exit_status_code(0).is_err() {
+            eprintln!("The path `{}` is not a correct executable binary file.", home_dir_str);
+        }    
+        exit(0);
+    }
+
+    
 
     // TODO: Add help description.
     if opts.help_requested() {
         println!(
-            "zenith {}
-Benjamin Vaisvil <ben@neuon.com>
-Zenith, sort of like top but with histograms.
+            "El-Modeer {}
+Abdallah Abdelaziz <abdallah_taha@aucegypt>, 
+Amer Elsheikh <amer.elsheikh@aucegypt>, 
+Gehad Fekry <gehadsalemfekry@aucegypt>.
+El-Modeer, sort of like top but in rust.
 Up/down arrow keys move around the process table. Return (enter) will focus on a process.
-Tab switches the active section. Active sections can be expanded (e) and minimized (m).
-Using this you can create the layout you want.
 
 Usage: {} [OPTIONS]
 
@@ -317,21 +325,6 @@ Usage: {} [OPTIONS]
         println!("el-modeer {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
-
-    // let graphics_height = {
-    //     // attribute used instead of if cfg! because if cfg! does not handle conditional existence of struct fields
-    //     #[cfg(feature = "nvidia")]
-    //     {
-    //         opts.graphics_height
-    //     }
-    //     #[cfg(not(feature = "nvidia"))]
-    //     {
-    //         0
-    //     }
-    // };
-
-    // env_logger::init();
-    // info!("Starting El-Modeer {}", env!("CARGO_PKG_VERSION"));
 
     start_elmodeer(
         opts.refresh_rate,
@@ -392,6 +385,13 @@ struct MOptions {
         meta = "INT"
     )]
     refresh_rate: u64,
+
+    /// Start GUI tree
+    #[options(
+        short = "t",
+        long = "tree"
+    )]
+    tree: bool,
 
     // Min Percent Height of Graphics Card visualization.
     // #[cfg(feature = "nvidia")]

@@ -23,9 +23,13 @@ pub fn render_process_table(
     show_paths: bool,
     show_find: bool,
     show_kill: bool,
+    show_suspend: bool,
+    show_resume: bool,
+    show_nice: bool,
     show_rate: bool,
     filter: &str,
-    kill_pid: &str,
+    action_pid: &str,
+    action_input: &str,
     new_rate: &str,
     process_table_message: &String,
     highlighted_row: usize,
@@ -147,19 +151,7 @@ pub fn render_process_table(
                 app.top_pids.iowait.pid,
                 format!("{:>5.1}", p.get_io_wait(&Duration::from_millis(tick_rate))),
             ));
-            #[cfg(feature = "nvidia")]
-            row.push(set_process_row_style(
-                p.pid,
-                app.top_pids.gpu.pid,
-                format!("{:>4.0}", p.gpu_usage),
-            ));
-            #[cfg(feature = "nvidia")]
-            row.push(set_process_row_style(
-                p.pid,
-                app.top_pids.frame_buffer.pid,
-                format!("{:>4.0}", p.fb_utilization),
-            ));
-
+        
             row.push(Cell::from(format!("{:}{:}", p.name, cmd_string)));
 
             let row = Row::new(row);
@@ -190,14 +182,9 @@ pub fn render_process_table(
         String::from("S "),
         String::from("READ/s   "),
         String::from("WRITE/s  "),
+        String::from("IOWAIT% "),
     ];
-    #[cfg(target_os = "linux")]
-    header.push(String::from("IOWAIT% "));
-    #[cfg(feature = "nvidia")]
-    header.push(String::from("GPU% "));
-    #[cfg(feature = "nvidia")]
-    header.push(String::from("FB%  "));
-    //figure column widths
+
     let mut widths = Vec::with_capacity(header.len() + 1);
     let mut used_width = 0;
     for item in &header {
@@ -237,14 +224,18 @@ pub fn render_process_table(
     } else if !filter.is_empty() {
         format!("Filtered Results: {:}, [/] to change/clear", filter)
     } else if show_kill {
-        format!("[ESC] Clear, PID to kill: {:}{}", kill_pid, process_table_message)
+        format!("[ESC] Clear, PID to kill: {:}{}", action_pid, process_table_message)
+    } else if show_suspend {
+        format!("[ESC] Clear, PID to suspend: {:}{}", action_pid, process_table_message)
+    } else if show_resume {
+        format!("[ESC] Clear, PID to resume: {:}{}", action_pid, process_table_message)
+    } else if show_nice {
+        format!("[ESC] Clear, PID to nice: {:}{}{}", action_pid, process_table_message, action_input)
     } else if show_rate {
         format!("[ESC] Clear, set refresh rate in millis: {:}{}", new_rate, process_table_message)
     }
      else {
-        format!(
-            "Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k]",
-        )
+        format!("Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k] Suspend [s] Resume [r] Nice [n]")
     };
 
     Table::new(rows)
