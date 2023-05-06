@@ -24,6 +24,7 @@ use crossterm::{
     terminal::EnterAlternateScreen,
 };
 use num_traits::FromPrimitive;
+use sysinfo::SystemExt;
 // use std::cmp::Eq;
 use std::io;
 use std::io::Stdout;
@@ -220,11 +221,15 @@ pub struct TerminalRenderer<'a> {
     show_paths: bool,
     show_find: bool,
     show_kill: bool,
+    show_suspend: bool,
+    show_resume: bool,
+    show_nice: bool,
     show_section_mgr: bool,
     show_column_mgr: bool,
     freeze: bool,
     filter: String,
-    kill_pid: String,
+    action_pid: String,
+    action_input: String,
     highlighted_row: usize,
     selection_grace_start: Option<Instant>,
     section_manager_options: SectionMGRList<'a>,
@@ -296,11 +301,15 @@ impl<'a> TerminalRenderer<'_> {
             show_paths: false,
             show_find: false,
             show_kill: false,
+            show_suspend: false,
+            show_resume: false,
+            show_nice: false,
             show_section_mgr: false,
             show_column_mgr: false,
             freeze: false,
             filter: String::from(""),
-            kill_pid: String::from(""),
+            action_pid: String::from(""),
+            action_input: String::from(""),
             highlighted_row: 0,
             selection_grace_start: None,
             section_manager_options: SectionMGRList::with_geometry(section_geometry),
@@ -384,7 +393,11 @@ impl<'a> TerminalRenderer<'_> {
             let filter = &self.filter;
             let show_find = self.show_find;
             let show_kill = self.show_kill;
-            let kill_pid = &self.kill_pid;
+            let show_suspend = self.show_suspend;
+            let show_resume = self.show_resume;
+            let show_nice = self.show_nice;
+            let action_pid = &self.action_pid;
+            let action_input = &self.action_input;
             let mut highlighted_process: Option<Box<MProcess>> = None;
             let process_table = process::filter_process_table(app, &self.filter);
             // let gfx_device_index = &self.gfx_device_index;
@@ -507,8 +520,12 @@ impl<'a> TerminalRenderer<'_> {
                                             show_paths,
                                             show_find,
                                             show_kill,
+                                            show_suspend,
+                                            show_resume,
+                                            show_nice,
                                             filter,
-                                            kill_pid,
+                                            action_pid,
+                                            action_input,
                                             process_table_message,
                                             highlighted_row,
                                             freeze
@@ -614,16 +631,67 @@ impl<'a> TerminalRenderer<'_> {
             // Key::Right => self.histogram_right(),
             Key::Enter => {
                 if self.show_kill {
-                    if self.kill_pid.chars().all(|c| c.is_digit(10)) {
-                        self.process_table_message = match hproc::get(self.kill_pid.parse().unwrap()).await {
+                    if self.action_pid.chars().all(|c| c.is_digit(10)) && !self.action_pid.is_empty() {
+                        self.process_table_message = match hproc::get(self.action_pid.parse().unwrap()).await {
                             Ok(p) => convert_result_to_string!(p.kill().await),
                             Err(e) => convert_error_to_string!(e),
                         };
                     } else {
                         self.process_table_message = "Invalid PID".to_string();
                     }
+                    self.action_pid = String::new();
 
-                    self.kill_pid = String::new();
+                } else if self.show_suspend {
+                    if self.action_pid.chars().all(|c| c.is_digit(10)) && !self.action_pid.is_empty() {
+                        self.process_table_message = match hproc::get(self.action_pid.parse().unwrap()).await {
+                            Ok(p) => convert_result_to_string!(p.suspend().await),
+                            Err(e) => convert_error_to_string!(e),
+                        };
+                    } else {
+                        self.process_table_message = "Invalid PID".to_string();
+                    }
+                    self.action_pid = String::new();
+
+                } else if self.show_resume {
+                    if self.action_pid.chars().all(|c| c.is_digit(10)) && !self.action_pid.is_empty() {
+                        self.process_table_message = match hproc::get(self.action_pid.parse().unwrap()).await {
+                            Ok(p) => convert_result_to_string!(p.resume().await),
+                            Err(e) => convert_error_to_string!(e),
+                        };
+                    } else {
+                        self.process_table_message = "Invalid PID".to_string();
+                    }
+                    self.action_pid = String::new();
+
+                } else if self.show_nice && self.process_table_message == " Choose a nice value (-20 to 19): ".to_string() {
+                    // Set the priority of the process to the specified value
+                    let nice_value: i32 = self.action_input.parse().unwrap();
+                    if nice_value < -20 || nice_value > 19 {
+                        self.process_table_message = "Invalid nice value".to_string();  
+                    } else {
+                        let result = unsafe { libc::setpriority(libc::PRIO_PROCESS, self.action_pid.parse().unwrap(), self.action_input.parse().unwrap()) };
+                        if result == -1 {
+                            self.process_table_message = "Failed to set process priority".to_string();
+                        } else {
+                            self.process_table_message = "Process priority set successfully".to_string();
+                        }  
+                    }
+
+                    self.action_pid = String::new();
+                    self.action_input = String::new();                  
+                } else if self.show_nice {
+                    if self.action_pid.is_empty() || !self.action_pid.chars().all(|c| c.is_digit(10)) {
+                        self.process_table_message = "Invalid PID".to_string();
+                        self.action_pid = String::new();
+                    } else {
+                        let process = self.app.system.get_process(self.action_pid.parse().unwrap()).is_some(); // Check if the process exists
+                        if process {
+                            self.process_table_message = " Choose a nice value (-20 to 19): ".to_string();
+                        } else {
+                            self.process_table_message = "No Such Process".to_string();
+                            self.action_pid = String::new();
+                        }
+                    }
                 } else {
                     self.select(highlighted_process);
                 }
@@ -635,6 +703,12 @@ impl<'a> TerminalRenderer<'_> {
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
+                } else if self.show_suspend {
+                    self.process_suspend_input(input);
+                } else if self.show_resume {
+                    self.process_resume_input(input);
+                } else if self.show_nice {
+                    self.process_nice_input(input);
                 } 
             }
             _other => {
@@ -642,6 +716,14 @@ impl<'a> TerminalRenderer<'_> {
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
+                } else if self.show_suspend {
+                    self.process_suspend_input(input);
+                } else if self.show_resume {
+                    self.process_resume_input(input);
+                } else if self.show_nice && self.process_table_message == " Choose a nice value (-20 to 19): ".to_string() {
+                    self.process_nice_value_input(input);
+                } else if self.show_nice {
+                    self.process_nice_input(input);
                 } else {
                     return self.process_toplevel_input(input).await;
                 }
@@ -658,6 +740,9 @@ impl<'a> TerminalRenderer<'_> {
             self.process_table_message = String::from("");
             self.show_find = false;
             self.show_kill = false;
+            self.show_suspend = false;
+            self.show_resume = false;
+            self.show_nice = false;
             self.process_table_row_start = 0;
         }
     }
@@ -806,20 +891,117 @@ impl<'a> TerminalRenderer<'_> {
         match input.code {
             Key::Esc => {
                 self.show_kill = false;
-                self.kill_pid = String::from("");
+                self.action_pid = String::from("");
+                self.process_table_message = String::from("");
             }
             Key::Char(c) if c != '\n' => {
                 self.selection_grace_start = Some(Instant::now());
                 self.process_table_message = String::from("");
-                self.kill_pid.push(c)
+                self.action_pid.push(c)
             }
-            Key::Delete => match self.kill_pid.pop() {
+            Key::Delete => match self.action_pid.pop() {
                 Some(_c) => {}
                 None => self.show_kill = false,
             },
-            Key::Backspace => match self.kill_pid.pop() {
+            Key::Backspace => match self.action_pid.pop() {
                 Some(_c) => {}
                 None => self.show_kill = false,
+            },
+            _ => {}
+        }
+    }
+
+    fn process_suspend_input(&mut self, input: KeyEvent) {
+        match input.code {
+            Key::Esc => {
+                self.show_suspend = false;
+                self.action_pid = String::from("");
+                self.process_table_message = String::from("");
+            }
+            Key::Char(c) if c != '\n' => {
+                self.selection_grace_start = Some(Instant::now());
+                self.process_table_message = String::from("");
+                self.action_pid.push(c)
+            }
+            Key::Delete => match self.action_pid.pop() {
+                Some(_c) => {}
+                None => self.show_suspend = false,
+            },
+            Key::Backspace => match self.action_pid.pop() {
+                Some(_c) => {}
+                None => self.show_suspend = false,
+            },
+            _ => {}
+        }
+    }
+
+    fn process_resume_input(&mut self, input: KeyEvent) {
+        match input.code {
+            Key::Esc => {
+                self.show_resume = false;
+                self.action_pid = String::from("");
+                self.process_table_message = String::from("");
+            }
+            Key::Char(c) if c != '\n' => {
+                self.selection_grace_start = Some(Instant::now());
+                self.process_table_message = String::from("");
+                self.action_pid.push(c)
+            }
+            Key::Delete => match self.action_pid.pop() {
+                Some(_c) => {}
+                None => self.show_resume = false,
+            },
+            Key::Backspace => match self.action_pid.pop() {
+                Some(_c) => {}
+                None => self.show_resume = false,
+            },
+            _ => {}
+        }
+    }
+
+    fn process_nice_input(&mut self, input: KeyEvent) {
+        match input.code {
+            Key::Esc => {
+                self.show_nice = false;
+                self.action_pid = String::from("");
+                self.process_table_message = String::from("");
+            }
+            Key::Char(c) if c != '\n' => {
+                self.selection_grace_start = Some(Instant::now());
+                self.process_table_message = String::from("");
+                self.action_pid.push(c)
+            }
+            Key::Delete => match self.action_pid.pop() {
+                Some(_c) => {}
+                None => self.show_nice = false,
+            },
+            Key::Backspace => match self.action_pid.pop() {
+                Some(_c) => {}
+                None => self.show_nice = false,
+            },
+            _ => {}
+        }
+    }
+
+    fn process_nice_value_input(&mut self, input: KeyEvent) {
+        match input.code {
+            Key::Esc => {
+                self.show_nice = false;
+                self.action_pid = String::from("");
+                self.action_input = String::from("");
+            }
+            Key::Char(c) if c != '\n' => {
+                self.selection_grace_start = Some(Instant::now());
+                // self.process_table_message = String::from("");
+                self.action_input.push(c)
+            }
+            Key::Delete => match self.action_input.pop() {
+                Some(_c) => {}
+                None => self.show_nice = false,
+            },
+            Key::Backspace => match self.action_input.pop() {
+                Some(_c) => {}
+                None => self.show_nice = false,
             },
             _ => {}
         }
@@ -965,12 +1147,18 @@ impl<'a> TerminalRenderer<'_> {
                 self.process_message = None;
             }
             Key::Char('s') => {
+                if self.app.selected_process.is_none() {
+                    self.show_suspend = true;
+                }
                 self.process_message = match &self.app.selected_process {
                     Some(p) => Some(p.suspend().await),
                     None => None,
                 };
             }
             Key::Char('r') => {
+                if self.app.selected_process.is_none() {
+                    self.show_resume = true;
+                }
                 self.process_message = match &self.app.selected_process {
                     Some(p) => Some(p.resume().await),
                     None => None,
@@ -992,6 +1180,9 @@ impl<'a> TerminalRenderer<'_> {
                 };
             }
             Key::Char('n') => {
+                if self.app.selected_process.is_none() {
+                    self.show_nice = true;
+                }
                 self.process_message = self.app.selected_process.as_mut().map(|p| p.nice());
             }
             Key::Char('p') if self.app.selected_process.is_some() => {

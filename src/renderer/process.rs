@@ -23,8 +23,12 @@ pub fn render_process_table(
     show_paths: bool,
     show_find: bool,
     show_kill: bool,
+    show_suspend: bool,
+    show_resume: bool,
+    show_nice: bool,
     filter: &str,
-    kill_pid: &str,
+    action_pid: &str,
+    action_input: &str,
     process_table_message: &String,
     highlighted_row: usize,
     freeze: bool,
@@ -234,11 +238,15 @@ pub fn render_process_table(
     } else if !filter.is_empty() {
         format!("Filtered Results: {:}, [/] to change/clear", filter)
     } else if show_kill {
-        format!("[ESC] Clear, PID to kill: {:}{}", kill_pid, process_table_message)
+        format!("[ESC] Clear, PID to kill: {:}{}", action_pid, process_table_message)
+    } else if show_suspend {
+        format!("[ESC] Clear, PID to suspend: {:}{}", action_pid, process_table_message)
+    } else if show_resume {
+        format!("[ESC] Clear, PID to resume: {:}{}", action_pid, process_table_message)
+    } else if show_nice {
+        format!("[ESC] Clear, PID to nice: {:}{}{}", action_pid, process_table_message, action_input)
     } else {
-        format!(
-            "Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k]",
-        )
+        format!("Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k] Suspend [s] Resume [r] Nice [n]")
     };
 
     Table::new(rows)
