@@ -6,7 +6,7 @@ pub mod section;
 pub mod column;
 use crate::metrics::mprocess::*;
 use crate::metrics::*;
-use crate::renderer::section::{sum_section_heights, Section, SectionMGRList};
+use crate::renderer::section::{Section, SectionMGRList};
 use crate::renderer::column::{Column, ColumnMGRList};
 use crate::util::*;
 use crate::{convert_result_to_string, convert_error_to_string};
@@ -57,16 +57,16 @@ where
     }
 }
 
-macro_rules! update_section_height {
-    ($x:expr, $val:expr) => {
-        if $x + $val > 0.0 && $x + $val < 100.0 {
-            $x += $val;
-            true
-        } else {
-            false
-        }
-    };
-}
+// macro_rules! update_section_height {
+//     ($x:expr, $val:expr) => {
+//         if $x + $val > 0.0 && $x + $val < 100.0 {
+//             $x += $val;
+//             true
+//         } else {
+//             false
+//         }
+//     };
+// }
 
 /// current size of the terminal returned as (columns, rows)
 fn terminal_size() -> (u16, u16) {
@@ -178,6 +178,7 @@ pub struct TerminalRenderer<'a> {
     show_help: bool,
     show_paths: bool,
     show_find: bool,
+    show_find_cat: bool,
     show_kill: bool,
     show_suspend: bool,
     show_resume: bool,
@@ -263,6 +264,7 @@ impl<'a> TerminalRenderer<'_> {
             show_help: false,
             show_paths: false,
             show_find: false,
+            show_find_cat: false,
             show_kill: false,
             show_suspend: false,
             show_resume: false,
@@ -291,39 +293,39 @@ impl<'a> TerminalRenderer<'_> {
     /// larger sections will be reduced more while smaller ones will be
     /// reduced less. Overall the total percentage heights in section_geometry
     /// should always be close to 100%.
-    async fn update_section_height(&mut self, delta: i16) {
-        // convert val to percentage
-        let (_, height) = terminal_size();
-        let avail_height = (height - 1) as f64;
-        let mut val = delta as f64 * 100.0 / avail_height;
-        let selected_index = self.selected_section_index;
-        let mut new_geometry = self.section_geometry.to_vec();
-        if update_section_height!(new_geometry[selected_index].1, val) {
-            // reduce proportionately from other sections if the value was updated
-            let rest = 100.0 - new_geometry[selected_index].1 + val;
-            for (section_index, section) in new_geometry.iter_mut().enumerate() {
-                if section_index != selected_index {
-                    let change = section.1 * val / rest;
-                    // abort if limits are exceeded
-                    if !update_section_height!(section.1, -change) {
-                        val = 0.0; // abort changes
-                        break;
-                    }
-                }
-            }
-            if val != 0.0 {
-                let mut borrowed = false;
-                let new_constraints = eval_constraints(&new_geometry, height, &mut borrowed);
-                // abort if process section became too small and borrowed from others
-                if !borrowed {
-                    let new_sum_heights = sum_section_heights(&new_geometry);
-                    assert!((99.9..=100.1).contains(&new_sum_heights));
-                    self.section_geometry = new_geometry;
-                    self.constraints = new_constraints;
-                }
-            }
-        }
-    }
+    // async fn update_section_height(&mut self, delta: i16) {
+    //     // convert val to percentage
+    //     let (_, height) = terminal_size();
+    //     let avail_height = (height - 1) as f64;
+    //     let mut val = delta as f64 * 100.0 / avail_height;
+    //     let selected_index = self.selected_section_index;
+    //     let mut new_geometry = self.section_geometry.to_vec();
+    //     if update_section_height!(new_geometry[selected_index].1, val) {
+    //         // reduce proportionately from other sections if the value was updated
+    //         let rest = 100.0 - new_geometry[selected_index].1 + val;
+    //         for (section_index, section) in new_geometry.iter_mut().enumerate() {
+    //             if section_index != selected_index {
+    //                 let change = section.1 * val / rest;
+    //                 // abort if limits are exceeded
+    //                 if !update_section_height!(section.1, -change) {
+    //                     val = 0.0; // abort changes
+    //                     break;
+    //                 }
+    //             }
+    //         }
+    //         if val != 0.0 {
+    //             let mut borrowed = false;
+    //             let new_constraints = eval_constraints(&new_geometry, height, &mut borrowed);
+    //             // abort if process section became too small and borrowed from others
+    //             if !borrowed {
+    //                 let new_sum_heights = sum_section_heights(&new_geometry);
+    //                 assert!((99.9..=100.1).contains(&new_sum_heights));
+    //                 self.section_geometry = new_geometry;
+    //                 self.constraints = new_constraints;
+    //             }
+    //         }
+    //     }
+    // }
 
     fn selected_section(&self) -> Section {
         self.section_geometry[self.selected_section_index].0
@@ -359,6 +361,7 @@ impl<'a> TerminalRenderer<'_> {
             let freeze = self.freeze;
             let filter = &self.filter;
             let show_find = self.show_find;
+            let show_find_cat = self.show_find_cat;
             let show_kill = self.show_kill;
             let show_suspend = self.show_suspend;
             let show_resume = self.show_resume;
@@ -368,7 +371,7 @@ impl<'a> TerminalRenderer<'_> {
             let action_input = &self.action_input;
             let new_rate = &self.new_rate;
             let mut highlighted_process: Option<Box<MProcess>> = None;
-            let process_table = process::filter_process_table(app, &self.filter);
+            let process_table = process::filter_process_table(app, &self.filter, self.show_find_cat);
             // let gfx_device_index = &self.gfx_device_index;
             // let file_system_index = &self.file_system_index;
             // let file_system_display = &self.file_system_display;
@@ -468,6 +471,7 @@ impl<'a> TerminalRenderer<'_> {
                                             border_style,
                                             show_paths,
                                             show_find,
+                                            show_find_cat,
                                             show_kill,
                                             show_suspend,
                                             show_resume,
@@ -669,7 +673,7 @@ impl<'a> TerminalRenderer<'_> {
             Key::Char('c') => {
                 if input.modifiers.contains(KeyModifiers::CONTROL) {
                     return Action::Quit;
-                } else if self.show_find {
+                } else if self.show_find || self.show_find_cat{
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
@@ -682,9 +686,14 @@ impl<'a> TerminalRenderer<'_> {
                 } else if self.show_rate{
                     self.process_rate_input(input);
                 }
+                else{
+                    self.show_find_cat = true;
+                    self.highlighted_row = 0;
+                    self.process_table_row_start = 0;
+                }
             }
             _other => {
-                if self.show_find {
+                if self.show_find || self.show_find_cat{
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
@@ -698,7 +707,7 @@ impl<'a> TerminalRenderer<'_> {
                     self.process_nice_input(input);
                 }else if self.show_rate{
                     self.process_rate_input(input);
-                } else {
+                }else {
                     return self.process_toplevel_input(input).await;
                 }
             }
@@ -713,6 +722,7 @@ impl<'a> TerminalRenderer<'_> {
             self.process_message = None;
             self.process_table_message = String::from("");
             self.show_find = false;
+            self.show_find_cat = false;
             self.show_kill = false;
             self.show_suspend = false;
             self.show_resume = false;
@@ -844,6 +854,7 @@ impl<'a> TerminalRenderer<'_> {
         match input.code {
             Key::Esc => {
                 self.show_find = false;
+                self.show_find_cat = false;
                 self.filter = String::from("");
             }
             Key::Char(c) if c != '\n' => {
@@ -852,11 +863,11 @@ impl<'a> TerminalRenderer<'_> {
             }
             Key::Delete => match self.filter.pop() {
                 Some(_c) => {}
-                None => self.show_find = false,
+                None => {self.show_find = false; self.show_find_cat = false;},
             },
             Key::Backspace => match self.filter.pop() {
                 Some(_c) => {}
-                None => self.show_find = false,
+                None => {self.show_find = false; self.show_find_cat = false;},
             },
             _ => {}
         }
