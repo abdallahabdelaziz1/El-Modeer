@@ -39,7 +39,7 @@ use tui::Frame;
 use heim::process as hproc;
 use heim::process::ProcessError;
 
-const PROCESS_SELECTION_GRACE: Duration = Duration::from_millis(2000);
+const PROCESS_SELECTION_GRACE: Duration = Duration::from_millis(2000); //TODO: check this
 // const LEFT_PANE_WIDTH: u16 = 34u16;
 
 type MBackend = CrosstermBackend<Stdout>;
@@ -220,17 +220,20 @@ pub struct TerminalRenderer<'a> {
     show_paths: bool,
     show_find: bool,
     show_kill: bool,
+    show_rate: bool,
     show_section_mgr: bool,
     show_column_mgr: bool,
     freeze: bool,
     filter: String,
     kill_pid: String,
+    new_rate: String,
     highlighted_row: usize,
     selection_grace_start: Option<Instant>,
     section_manager_options: SectionMGRList<'a>,
     column_manager_options: ColumnMGRList<'a>,
     // disable_history: bool,
     recompute_constraints_on_start_up: bool,
+    tick_rate: u64,
 }
 
 impl<'a> TerminalRenderer<'_> {
@@ -298,15 +301,18 @@ impl<'a> TerminalRenderer<'_> {
             show_kill: false,
             show_section_mgr: false,
             show_column_mgr: false,
+            show_rate: false,
             freeze: false,
             filter: String::from(""),
             kill_pid: String::from(""),
+            new_rate: String::from(""),
             highlighted_row: 0,
             selection_grace_start: None,
             section_manager_options: SectionMGRList::with_geometry(section_geometry),
             column_manager_options: ColumnMGRList::with_cols(default_cols),
             // disable_history,
             recompute_constraints_on_start_up,
+            tick_rate: tick_rate,
         }
     }
 
@@ -384,7 +390,9 @@ impl<'a> TerminalRenderer<'_> {
             let filter = &self.filter;
             let show_find = self.show_find;
             let show_kill = self.show_kill;
+            let show_rate = self.show_rate;
             let kill_pid = &self.kill_pid;
+            let new_rate = &self.new_rate;
             let mut highlighted_process: Option<Box<MProcess>> = None;
             let process_table = process::filter_process_table(app, &self.filter);
             // let gfx_device_index = &self.gfx_device_index;
@@ -396,6 +404,7 @@ impl<'a> TerminalRenderer<'_> {
             }
             let highlighted_row = self.highlighted_row;
 
+            let tick_rate = self.tick_rate;
             self.terminal
                 .draw(|f| {
                     width = f.size().width;
@@ -493,7 +502,8 @@ impl<'a> TerminalRenderer<'_> {
                                             border_style,
                                             process_message,
                                             p,
-                                            freeze
+                                            freeze, 
+                                            tick_rate
                                         );
 
                                     } else {
@@ -507,11 +517,14 @@ impl<'a> TerminalRenderer<'_> {
                                             show_paths,
                                             show_find,
                                             show_kill,
+                                            show_rate,
                                             filter,
                                             kill_pid,
+                                            new_rate,
                                             process_table_message,
                                             highlighted_row,
-                                            freeze
+                                            freeze,
+                                            tick_rate,
                                         );
                                         if v_section.height > 4 {
                                             // account for table border & margins.
@@ -614,7 +627,7 @@ impl<'a> TerminalRenderer<'_> {
             // Key::Right => self.histogram_right(),
             Key::Enter => {
                 if self.show_kill {
-                    if self.kill_pid.chars().all(|c| c.is_digit(10)) {
+                    if self.kill_pid.chars().all(|c| c.is_digit(10)) && !self.kill_pid.is_empty(){
                         self.process_table_message = match hproc::get(self.kill_pid.parse().unwrap()).await {
                             Ok(p) => convert_result_to_string!(p.kill().await),
                             Err(e) => convert_error_to_string!(e),
@@ -622,9 +635,30 @@ impl<'a> TerminalRenderer<'_> {
                     } else {
                         self.process_table_message = "Invalid PID".to_string();
                     }
-
                     self.kill_pid = String::new();
-                } else {
+                } else if self.show_rate {
+                    if self.new_rate.chars().all(|c| c.is_digit(10)) && !self.new_rate.is_empty(){
+                        let r: u64 = self.new_rate.parse().unwrap();
+                        if r < 1000{
+                            self.process_table_message = "The rate must be at least 1000 millis".to_string();
+                        }
+                        else{
+                            self.tick_rate = r;
+                            self.app.change_tick(Duration::from_millis(self.tick_rate));
+                            //= CPUTimeApp::new(Duration::from_millis(self.tick_rate));
+                            // debug!("Create Event Loop");
+                            // let events = Events::new(app.histogram_map.tick);
+                           // self.events.set_tick_rate(Duration::from_millis(self.tick_rate));
+                          // self.events = Events::new(Duration::from_millis(self.tick_rate));
+                            self.process_table_message = "The rate has been set".to_string();
+                        }
+                    }
+                    else{
+                        self.process_table_message = "Invalid rate".to_string();
+                    }
+                    self.new_rate = String::new();
+                } 
+                else {
                     self.select(highlighted_process);
                 }
             }
@@ -635,13 +669,17 @@ impl<'a> TerminalRenderer<'_> {
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
-                } 
+                } else if self.show_rate{
+                    self.process_rate_input(input);
+                }
             }
             _other => {
                 if self.show_find {
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
+                }else if self.show_rate{
+                    self.process_rate_input(input);
                 } else {
                     return self.process_toplevel_input(input).await;
                 }
@@ -658,6 +696,7 @@ impl<'a> TerminalRenderer<'_> {
             self.process_table_message = String::from("");
             self.show_find = false;
             self.show_kill = false;
+            self.show_rate = false;
             self.process_table_row_start = 0;
         }
     }
@@ -825,6 +864,30 @@ impl<'a> TerminalRenderer<'_> {
         }
     }
 
+    fn process_rate_input(&mut self, input: KeyEvent) {
+         match input.code {
+            Key::Esc => {
+                self.show_rate = false;
+                self.process_table_message = String::from("");
+                self.new_rate = String::from("");
+            }
+            Key::Char(c) if c != '\n' => {
+                self.selection_grace_start = Some(Instant::now());
+                self.process_table_message = String::from("");
+                self.new_rate.push(c)
+            }
+            Key::Delete => match self.new_rate.pop() {
+                Some(_c) => {}
+                None => self.show_rate = false,
+            },
+            Key::Backspace => match self.new_rate.pop() {
+                Some(_c) => {}
+                None => self.show_rate = false,
+            },
+            _ => {}
+        }
+    }
+
     fn recompute_constraints(&mut self) {
         self.selected_section_index = 0;
         for idx in 0..self.section_geometry.len() {
@@ -986,6 +1049,9 @@ impl<'a> TerminalRenderer<'_> {
                 };
             }
             Key::Char('t') => {
+                // if self.app.selected_process.is_none(){
+                //     self.show_rate = true;
+                // }
                 self.process_message = match &self.app.selected_process {
                     Some(p) => Some(p.terminate().await),
                     None => None,

@@ -12,6 +12,7 @@ use std::path::{Path};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+///use std::mem::replace;
 
 pub enum Event<I> {
     Input(I),
@@ -101,10 +102,77 @@ impl Events {
         }
     }
 
+
+    // // pub fn set_tick_rate(&mut self, tick_rate: Duration) {
+    // //     // Update the tick_rate in the config struct
+    // //     let mut config = Config::default();
+    // //     config.tick_rate = tick_rate;
+
+    // //     // Stop the old tick_handle thread
+    // //     self.tick_handle.thread().unpark();
+
+    // //     // Spawn a new tick_handle thread with the updated config
+    // //     let tx = self.rx.clone();
+    // //     self.tick_handle = thread::spawn(move || {
+    // //         let tx = tx.clone();
+    // //         let mut count: u64 = 0;
+    // //         loop {
+    // //             tx.send(Event::Tick).expect("Couldn't send event.");
+    // //             count += 1;
+    // //             if count % 60 == 0 {
+    // //                 tx.send(Event::Save).expect("Couldn't send event");
+    // //             }
+    // //             thread::sleep(config.tick_rate);
+    // //         }
+    // //     });
+    // // }
+
+    // pub fn set_tick_rate(&mut self, tick_rate: Duration) {
+    //     let (tx, rx) = mpsc::channel();
+    //     let tick_handle = thread::spawn(move || {
+    //         let tx = tx.clone();
+    //         let mut count: u64 = 0;
+    //         loop {
+    //             tx.send(Event::Tick).expect("Couldn't send event.");
+    //             count += 1;
+    //             if count % 60 == 0 {
+    //                 tx.send(Event::Save).expect("Couldn't send event");
+    //             }
+    //             thread::sleep(tick_rate);
+    //         }
+    //     });
+    //     let _ = replace(&mut self.rx, rx); // ignore error
+    //     let _ = replace(&mut self.tick_handle, tick_handle); // ignore error
+    // }
+
+    
+    
+
     pub fn next(&self) -> Result<Event<KeyEvent>, mpsc::RecvError> {
         self.rx.recv()
     }
 }
+
+
+// pub fn change_tick_handle(&self, tick_rate:Duration){
+//     let (tx, rx) = mpsc::channel();
+//     self.tick_handle = {
+//         let tx :  std::sync::mpsc::Sender<T> = tx.clone();
+//         thread::spawn(move || {
+//             let tx = tx.clone();
+//             let mut count: u64 = 0;
+//             loop {
+//                 tx.send(Event::Tick).expect("Couldn't send event.");
+//                 count += 1;
+//                 if count % 60 == 0 {
+//                     tx.send(Event::Save).expect("Couldn't send event");
+//                 }
+//                 thread::sleep(tick_rate);
+//             }
+//         })
+//     };
+
+// }
 
 // /// Keeps a file open exclusively
 // /// Removes the file when dropped

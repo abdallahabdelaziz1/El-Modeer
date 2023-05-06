@@ -263,6 +263,7 @@ pub struct CPUTimeApp {
     pub max_pid_len: usize,
     pub batteries: Vec<starship_battery::Battery>,
     pub uptime: Duration,
+    pub tick: Duration
     // #[cfg(all(target_os = "linux", feature = "nvidia"))]
     // pub nvml: Option<nvml::Nvml>,
     // #[cfg(all(target_os = "linux", feature = "nvidia"))]
@@ -278,7 +279,7 @@ pub struct CPUTimeApp {
 }
 
 impl CPUTimeApp {
-    pub fn new(_tick: Duration) -> CPUTimeApp { // TODO: remove the _ when using the variable (_ is there to avoid the warning)
+    pub fn new(tick: Duration) -> CPUTimeApp { 
         debug!("Create Histogram Map");
         // let histogram_map = HistogramMap::new(Duration::from_secs(60 * 60 * 24), tick, db);
         #[cfg(all(target_os = "linux", feature = "nvidia"))]
@@ -357,6 +358,7 @@ impl CPUTimeApp {
             batteries: vec![],
             top_pids: Top::default(),
             uptime: Duration::from_secs(0),
+            tick: tick,
             //gfx_devices: vec![],
 
             #[cfg(all(target_os = "linux", feature = "nvidia"))]
@@ -626,7 +628,7 @@ impl CPUTimeApp {
         let sorter = MProcess::field_comparator(self.psortby);
         let sortorder = &self.psortorder;
         // let tick = self.histogram_map.tick;
-        let tick = Duration::from_millis(2000); // TODO: fix this
+        let tick = self.tick;
         self.processes.sort_by(|a, b| {
             let pa = pm.get(a).expect("Error in sorting the process table.");
             let pb = pm.get(b).expect("Error in sorting the process table.");
@@ -637,6 +639,10 @@ impl CPUTimeApp {
                 ProcessTableSortOrder::Descending => ord.reverse(),
             }
         });
+    }
+
+    pub fn change_tick(&mut self, new_tick: Duration){
+        self.tick = new_tick;
     }
 
     async fn update_frequency(&mut self) {

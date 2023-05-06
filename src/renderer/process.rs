@@ -23,11 +23,14 @@ pub fn render_process_table(
     show_paths: bool,
     show_find: bool,
     show_kill: bool,
+    show_rate: bool,
     filter: &str,
     kill_pid: &str,
+    new_rate: &str,
     process_table_message: &String,
     highlighted_row: usize,
     freeze: bool,
+    tick_rate: u64,
 ) -> Option<Box<MProcess>> {
     // 4 for the margins and table header
     let display_height = match area.height.saturating_sub(4) {
@@ -118,7 +121,7 @@ pub fn render_process_table(
                     format!(
                         "{:>8}",
                         float_to_byte_string!(
-                            p.get_read_bytes_sec(&Duration::from_millis(2000)), // TODO: make this configurable
+                            p.get_read_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this configurable
                             ByteUnit::B
                         )
                         .replace('B', "")
@@ -130,7 +133,7 @@ pub fn render_process_table(
                     format!(
                         "{:>8}",
                         float_to_byte_string!(
-                            p.get_write_bytes_sec(&Duration::from_millis(2000)), // TODO: make this configurable
+                            p.get_write_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this configurable
                             ByteUnit::B
                         )
                         .replace('B', "")
@@ -142,7 +145,7 @@ pub fn render_process_table(
             row.push(set_process_row_style(
                 p.pid,
                 app.top_pids.iowait.pid,
-                format!("{:>5.1}", p.get_io_wait(&Duration::from_millis(2000))),
+                format!("{:>5.1}", p.get_io_wait(&Duration::from_millis(tick_rate))),
             ));
             #[cfg(feature = "nvidia")]
             row.push(set_process_row_style(
@@ -235,7 +238,10 @@ pub fn render_process_table(
         format!("Filtered Results: {:}, [/] to change/clear", filter)
     } else if show_kill {
         format!("[ESC] Clear, PID to kill: {:}{}", kill_pid, process_table_message)
-    } else {
+    } else if show_rate {
+        format!("[ESC] Clear, set refresh rate in millis: {:}{}", new_rate, process_table_message)
+    }
+     else {
         format!(
             "Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k]",
         )
@@ -267,7 +273,18 @@ pub fn render_process_table(
         .block(Block::default())
         .render(f, Rect::new(1, f.size().height.saturating_sub(2), 12, 1));
     }
+    else {
+        let rate_text = vec![Spans::from(vec![
+            Span::styled("  Refresh Rate:", Style::default().fg(Color::White).bg(Color::DarkGray)),
+            Span::styled(format!(" {}  ", tick_rate), Style::default().fg(Color::White).bg(Color::DarkGray)),
+        ])];
 
+        let l : u16 = (tick_rate.to_string().len() + 18) as u16;
+
+        Paragraph::new(rate_text)
+            .block(Block::default())
+            .render(f, Rect::new(f.size().right().saturating_sub(l+1), f.size().height.saturating_sub(2), l, 1));
+    }
 
     highlighted_process
 }
@@ -279,7 +296,8 @@ pub fn render_process(
     border_style: Style,
     process_message: &Option<String>,
     p: &MProcess,
-    freeze: bool
+    freeze: bool,
+    tick_rate: u64,
 ) {
     Block::default()
         .title(Span::styled(format!("Process: {0}", p.name), border_style))
@@ -320,7 +338,7 @@ pub fn render_process(
         run_duration.num_seconds() % 60
     );
 
-    let rhs_style = Style::default().fg(Color::Blue);
+    let rhs_style = Style::default().fg(Color::Green);
     let mut text = vec![
         Spans::from(vec![
             Span::raw("Name:                  "),
@@ -399,7 +417,7 @@ pub fn render_process(
                     "{:>10} {:}/s",
                     float_to_byte_string!(p.read_bytes as f64, ByteUnit::B),
                     float_to_byte_string!(
-                        p.get_read_bytes_sec(&Duration::from_millis(2000)), // TODO: make this a setting
+                        p.get_read_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this a setting
                         ByteUnit::B
                     )
                 ),
@@ -413,7 +431,7 @@ pub fn render_process(
                     "{:>10} {:}/s",
                     float_to_byte_string!(p.write_bytes as f64, ByteUnit::B),
                     float_to_byte_string!(
-                        p.get_write_bytes_sec(&Duration::from_millis(2000)), // TODO: make this a setting
+                        p.get_write_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this a setting
                         ByteUnit::B
                     )
                 ),
@@ -451,7 +469,7 @@ pub fn render_process(
         Span::styled(
             format!(
                 "{:>7.2} % ({:>7.2} %)",
-                p.get_io_wait(&Duration::from_millis(2000)), // TODO: make this a setting
+                p.get_io_wait(&Duration::from_millis(tick_rate)), // TODO: make this a setting
                 p.get_total_io_wait()
             ),
             rhs_style,
@@ -463,7 +481,7 @@ pub fn render_process(
         Span::styled(
             format!(
                 "{:>7.2} % ({:>7.2} %)",
-                p.get_swap_wait(&Duration::from_millis(2000)), // TODO: make this a setting
+                p.get_swap_wait(&Duration::from_millis(tick_rate)), // TODO: make this a setting
                 p.get_total_swap_wait()
             ),
             rhs_style,
@@ -506,6 +524,18 @@ pub fn render_process(
         Paragraph::new(frozen_text)
         .block(Block::default())
         .render(f, Rect::new(1, f.size().height.saturating_sub(2), 12, 1));
+    }
+    else {
+        let rate_text = vec![Spans::from(vec![
+            Span::styled("  Refresh Rate:", Style::default().fg(Color::White).bg(Color::DarkGray)),
+            Span::styled(format!(" {}  ", tick_rate), Style::default().fg(Color::White).bg(Color::DarkGray)),
+        ])];
+
+        let l : u16 = (tick_rate.to_string().len() + 18) as u16;
+
+        Paragraph::new(rate_text)
+            .block(Block::default())
+            .render(f, Rect::new(f.size().right().saturating_sub(l+1), f.size().height.saturating_sub(2), l, 1));
     }
 }
 
