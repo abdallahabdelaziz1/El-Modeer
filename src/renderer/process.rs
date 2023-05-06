@@ -22,6 +22,7 @@ pub fn render_process_table(
     border_style: Style,
     show_paths: bool,
     show_find: bool,
+    show_find_cat: bool,
     show_kill: bool,
     show_suspend: bool,
     show_resume: bool,
@@ -221,7 +222,10 @@ pub fn render_process_table(
         .collect();
     let title = if show_find {
         format!("[ESC] Clear, Find: {:}", filter)
-    } else if !filter.is_empty() {
+    } else if show_find_cat {
+        format!("[ESC] Clear, Category: {:}", filter)
+    }
+    else if !filter.is_empty() {
         format!("Filtered Results: {:}, [/] to change/clear", filter)
     } else if show_kill {
         format!("[ESC] Clear, PID to kill: {:}{}", action_pid, process_table_message)
@@ -235,7 +239,7 @@ pub fn render_process_table(
         format!("[ESC] Clear, set refresh rate in millis: {:}{}", new_rate, process_table_message)
     }
      else {
-        format!("Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k] Suspend [s] Resume [r] Nice [n]")
+        format!("Freeze [f] Sort Col [,/.] Asc/Dec [;] Filter [/] Category [c] Kill [k] Suspend [s] Resume [r] Nice [n]")
     };
 
     Table::new(rows)
@@ -530,13 +534,15 @@ pub fn render_process(
     }
 }
 
-pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str) -> Cow<'a, [i32]> {
+pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str, show_find_cat: bool) -> Cow<'a, [i32]> {
     if filter.is_empty() {
         return Cow::Borrowed(&app.processes);
     }
 
     let filter_lc = filter.to_lowercase();
-    let results: Vec<i32> = app
+    let mut results : Vec<i32> = Vec::new();
+    if !show_find_cat {
+        results = app
         .processes
         .iter()
         .filter(|pid| {
@@ -548,9 +554,28 @@ pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str) -> Cow<'a, [i
                 || p.exe.to_lowercase().contains(&filter_lc)
                 || p.command.join(" ").to_lowercase().contains(&filter_lc)
                 || format!("{:}", p.pid).contains(&filter_lc)
+                || p.status.to_string().to_lowercase().contains(&filter_lc)
+                || p.user_name.to_lowercase().contains(&filter_lc)
         })
         .copied()
         .collect();
+    }
+    else{
+        results = app
+        .processes
+        .iter()
+        .filter(|pid| {
+            let p = app
+                .process_map
+                .get(pid)
+                .expect("Pid present in processes but not in map.");
+            p.status.to_string().to_lowercase().contains(&filter_lc)
+        })
+        .copied()
+        .collect();
+
+    }
+   
     results.into()
 }
 

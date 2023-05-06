@@ -29,7 +29,7 @@ use std::io::stdout;
 // use std::time::Duration;
 // use std::time::SystemTime;
 use std::process::{Command,exit};
-use std::path::PathBuf;
+//use std::path::PathBuf;
 use dirs;
 use execute::Execute;
 

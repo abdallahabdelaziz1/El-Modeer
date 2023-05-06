@@ -178,6 +178,7 @@ pub struct TerminalRenderer<'a> {
     show_help: bool,
     show_paths: bool,
     show_find: bool,
+    show_find_cat: bool,
     show_kill: bool,
     show_suspend: bool,
     show_resume: bool,
@@ -261,6 +262,7 @@ impl<'a> TerminalRenderer<'_> {
             show_help: false,
             show_paths: false,
             show_find: false,
+            show_find_cat: false,
             show_kill: false,
             show_suspend: false,
             show_resume: false,
@@ -356,6 +358,7 @@ impl<'a> TerminalRenderer<'_> {
             let freeze = self.freeze;
             let filter = &self.filter;
             let show_find = self.show_find;
+            let show_find_cat = self.show_find_cat;
             let show_kill = self.show_kill;
             let show_suspend = self.show_suspend;
             let show_resume = self.show_resume;
@@ -365,7 +368,7 @@ impl<'a> TerminalRenderer<'_> {
             let action_input = &self.action_input;
             let new_rate = &self.new_rate;
             let mut highlighted_process: Option<Box<MProcess>> = None;
-            let process_table = process::filter_process_table(app, &self.filter);
+            let process_table = process::filter_process_table(app, &self.filter, self.show_find_cat);
             // let gfx_device_index = &self.gfx_device_index;
             // let file_system_index = &self.file_system_index;
             // let file_system_display = &self.file_system_display;
@@ -487,6 +490,7 @@ impl<'a> TerminalRenderer<'_> {
                                             border_style,
                                             show_paths,
                                             show_find,
+                                            show_find_cat,
                                             show_kill,
                                             show_suspend,
                                             show_resume,
@@ -688,7 +692,7 @@ impl<'a> TerminalRenderer<'_> {
             Key::Char('c') => {
                 if input.modifiers.contains(KeyModifiers::CONTROL) {
                     return Action::Quit;
-                } else if self.show_find {
+                } else if self.show_find || self.show_find_cat{
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
@@ -701,9 +705,14 @@ impl<'a> TerminalRenderer<'_> {
                 } else if self.show_rate{
                     self.process_rate_input(input);
                 }
+                else{
+                    self.show_find_cat = true;
+                    self.highlighted_row = 0;
+                    self.process_table_row_start = 0;
+                }
             }
             _other => {
-                if self.show_find {
+                if self.show_find || self.show_find_cat{
                     self.process_find_input(input);
                 } else if self.show_kill {
                     self.process_kill_input(input);
@@ -717,7 +726,7 @@ impl<'a> TerminalRenderer<'_> {
                     self.process_nice_input(input);
                 }else if self.show_rate{
                     self.process_rate_input(input);
-                } else {
+                }else {
                     return self.process_toplevel_input(input).await;
                 }
             }
@@ -732,6 +741,7 @@ impl<'a> TerminalRenderer<'_> {
             self.process_message = None;
             self.process_table_message = String::from("");
             self.show_find = false;
+            self.show_find_cat = false;
             self.show_kill = false;
             self.show_suspend = false;
             self.show_resume = false;
@@ -863,6 +873,7 @@ impl<'a> TerminalRenderer<'_> {
         match input.code {
             Key::Esc => {
                 self.show_find = false;
+                self.show_find_cat = false;
                 self.filter = String::from("");
             }
             Key::Char(c) if c != '\n' => {
@@ -871,11 +882,11 @@ impl<'a> TerminalRenderer<'_> {
             }
             Key::Delete => match self.filter.pop() {
                 Some(_c) => {}
-                None => self.show_find = false,
+                None => {self.show_find = false; self.show_find_cat = false;},
             },
             Key::Backspace => match self.filter.pop() {
                 Some(_c) => {}
-                None => self.show_find = false,
+                None => {self.show_find = false; self.show_find_cat = false;},
             },
             _ => {}
         }
