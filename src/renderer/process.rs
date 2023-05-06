@@ -148,19 +148,7 @@ pub fn render_process_table(
                 app.top_pids.iowait.pid,
                 format!("{:>5.1}", p.get_io_wait(&Duration::from_millis(2000))),
             ));
-            #[cfg(feature = "nvidia")]
-            row.push(set_process_row_style(
-                p.pid,
-                app.top_pids.gpu.pid,
-                format!("{:>4.0}", p.gpu_usage),
-            ));
-            #[cfg(feature = "nvidia")]
-            row.push(set_process_row_style(
-                p.pid,
-                app.top_pids.frame_buffer.pid,
-                format!("{:>4.0}", p.fb_utilization),
-            ));
-
+        
             row.push(Cell::from(format!("{:}{:}", p.name, cmd_string)));
 
             let row = Row::new(row);
@@ -191,14 +179,9 @@ pub fn render_process_table(
         String::from("S "),
         String::from("READ/s   "),
         String::from("WRITE/s  "),
+        String::from("IOWAIT% "),
     ];
-    #[cfg(target_os = "linux")]
-    header.push(String::from("IOWAIT% "));
-    #[cfg(feature = "nvidia")]
-    header.push(String::from("GPU% "));
-    #[cfg(feature = "nvidia")]
-    header.push(String::from("FB%  "));
-    //figure column widths
+
     let mut widths = Vec::with_capacity(header.len() + 1);
     let mut used_width = 0;
     for item in &header {

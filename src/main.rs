@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate num_derive;
-#[macro_use]
-extern crate log;
 
 mod constants;
 mod metrics;
@@ -46,7 +44,6 @@ use std::process::exit;
 // }
 
 fn init_terminal() {
-    debug!("Initializing Terminal");
     let mut sout = stdout();
     execute!(sout, EnterAlternateScreen).expect("Unable to enter alternate screen");
     execute!(sout, cursor::Hide).expect("Unable to hide cursor");
@@ -55,7 +52,6 @@ fn init_terminal() {
 }
 
 fn restore_terminal() {
-    debug!("Restoring Terminal");
     let mut sout = stdout();
     // Restore cursor position and clear screen for TTYs
     execute!(sout, cursor::MoveTo(0, 0)).expect("Attempt to write to alternate screen failed.");
@@ -280,15 +276,6 @@ fn validate_refresh_rate(arg: &str) -> Result<u64, String> {
     }
 }
 
-// fn default_db_path() -> String {
-//     dirs_next::cache_dir()
-//         .unwrap_or_else(|| Path::new("./").to_owned())
-//         .join("zenith")
-//         .to_str()
-//         .expect("Couldn't set default db path")
-//         .to_string()
-// }
-
 fn main() -> Result<(), Box<dyn Error>> {
     let args = std::env::args().collect::<Vec<_>>();
     let opts =
@@ -317,21 +304,6 @@ Usage: {} [OPTIONS]
         println!("el-modeer {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
-
-    // let graphics_height = {
-    //     // attribute used instead of if cfg! because if cfg! does not handle conditional existence of struct fields
-    //     #[cfg(feature = "nvidia")]
-    //     {
-    //         opts.graphics_height
-    //     }
-    //     #[cfg(not(feature = "nvidia"))]
-    //     {
-    //         0
-    //     }
-    // };
-
-    // env_logger::init();
-    // info!("Starting El-Modeer {}", env!("CARGO_PKG_VERSION"));
 
     start_elmodeer(
         opts.refresh_rate,
@@ -392,9 +364,4 @@ struct MOptions {
         meta = "INT"
     )]
     refresh_rate: u64,
-
-    // Min Percent Height of Graphics Card visualization.
-    // #[cfg(feature = "nvidia")]
-    // #[options(short = "g", long = "graphics-height", default = "17", meta = "INT")]
-    // graphics_height: u16,
 }

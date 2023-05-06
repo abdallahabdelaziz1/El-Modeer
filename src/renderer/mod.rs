@@ -1,17 +1,9 @@
-mod cpu;
 mod system_info;
-mod disk;
-mod graphics;
 mod help;
 pub mod macros;
-mod network;
 mod process;
 pub mod section;
 pub mod column;
-pub mod style;
-mod title;
-// use crate::metrics::graphics::device::GraphicsExt;
-// use crate::metrics::histogram::View;
 use crate::metrics::mprocess::*;
 use crate::metrics::*;
 use crate::renderer::section::{sum_section_heights, Section, SectionMGRList};
@@ -76,39 +68,6 @@ macro_rules! update_section_height {
     };
 }
 
-// #[derive(FromPrimitive, PartialEq, Copy, Clone, Debug, Ord, PartialOrd, Eq)]
-// pub enum FileSystemDisplay {
-//     Usage,
-//     Activity,
-// }
-
-/// Returns rectangles for the left pane and right histogram, and a new view for the right histogram
-// fn split_left_right_pane(
-//     title: &str,
-//     area: Rect,
-//     f: &mut Frame<'_, MBackend>,
-//     view: View,
-//     border_style: Style,
-// ) -> (Vec<Rect>, View) {
-//     Block::default()
-//         .title(title)
-//         .borders(Borders::ALL)
-//         .border_style(border_style)
-//         .render(f, area);
-//     let layout = Layout::default()
-//         .margin(0)
-//         .direction(Direction::Horizontal)
-//         .constraints([Constraint::Length(LEFT_PANE_WIDTH), Constraint::Min(10)].as_ref())
-//         .split(area);
-
-//     let view = View {
-//         width: usize::from(layout[1].width).saturating_sub(2),
-//         ..view
-//     };
-
-//     (layout, view)
-// }
-
 /// current size of the terminal returned as (columns, rows)
 fn terminal_size() -> (u16, u16) {
     crossterm::terminal::size().expect("Failed to get terminal size")
@@ -128,7 +87,6 @@ fn eval_constraints(
     height: u16,
     borrowed: &mut bool,
 ) -> Vec<Constraint> {
-    debug!("Get Constraints");
     let mut constraints = vec![Constraint::Length(1)];
     let avail_height = height as i32 - 1;
     let mut process_index = -1;
@@ -568,7 +526,6 @@ impl<'a> TerminalRenderer<'_> {
                 //     Action::Continue
                 // }
                 Event::Terminate => {
-                    debug!("Event Terminate");
                     Action::Quit
                 }
                 _ => Action::Continue,
@@ -581,8 +538,6 @@ impl<'a> TerminalRenderer<'_> {
     }
 
     async fn process_tick(&mut self) {
-        debug!("Event Tick");
-
         if self.app.selected_process.is_none() {
             if let Some(start) = self.selection_grace_start {
                 if start.elapsed() > PROCESS_SELECTION_GRACE {

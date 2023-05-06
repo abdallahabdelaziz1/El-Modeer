@@ -3,8 +3,6 @@
  */
 use crate::metrics::*;
 use crate::renderer::{HistoryRecording, Render, MBackend};
-#[cfg(all(target_os = "linux", feature = "nvidia"))]
-use nvml::error::NvmlError;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
@@ -97,23 +95,6 @@ pub fn render_help(
         }
     }
 
-    #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    if let Some(ne) = &_app.nvml_error {
-        let content = match ne {
-            NvmlError::DriverNotLoaded => "NVIDIA Error: No Driver Detected.",
-            NvmlError::NoPermission => "NVIDIA Error: Permissioned denied to talk to driver.",
-            NvmlError::Unknown => "NVIDIA Error: Unkown Error.",
-            _ => "",
-        };
-        if content.len() > 0 {
-            t.push(Spans::from(vec![Span::styled("", header_style)]));
-            t.push(Spans::from(vec![Span::styled(
-                content,
-                Style::default().fg(Color::Yellow),
-            )]));
-        }
-    }
-
     let help_height = t.len() as u16;
 
     let help_layout = Layout::default()
@@ -138,7 +119,7 @@ pub fn render_help(
         .render(f, help_area);
 
     let t = vec![Span::styled(
-        concat!("zenith v", env!("CARGO_PKG_VERSION")),
+        concat!("El-modeer v", env!("CARGO_PKG_VERSION")),
         header_style,
     )];
     Paragraph::new(Spans::from(t))

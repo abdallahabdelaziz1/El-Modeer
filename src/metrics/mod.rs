@@ -1,18 +1,9 @@
-pub mod disk;
-pub mod graphics;
-pub mod histogram;
 pub mod mprocess;
 
-// use crate::metrics::disk::{get_device_name, get_disk_io_metrics, IoMetrics, ZDisk};
-// use crate::metrics::graphics::device::{GraphicsDevice, GraphicsExt};
-// use crate::metrics::histogram::{HistogramKind, HistogramMap};
 use crate::metrics::mprocess::MProcess;
 use crate::util::percent_of;
 
-use futures::StreamExt;
 use heim::host;
-use heim::net;
-use heim::net::Address;
 use heim::units::frequency::megahertz;
 use heim::units::time;
 use std::collections::{HashMap, HashSet};
@@ -21,14 +12,6 @@ use chrono::prelude::DateTime;
 use std::time::{UNIX_EPOCH};
 use chrono::Local;
 
-#[cfg(target_os = "linux")]
-// use linux_taskstats::{self, Client};
-
-#[cfg(all(feature = "nvidia", target_os = "linux"))]
-use nvml::error::NvmlError;
-#[cfg(all(feature = "nvidia", target_os = "linux"))]
-use nvml::{cuda_driver_version_major, cuda_driver_version_minor};
-
 use std::fs;
 use std::path::{Path};
 use sysinfo::{
@@ -36,63 +19,6 @@ use sysinfo::{
 };
 use users::{Users, UsersCache};
 
-#[cfg(all(feature = "nvidia", not(target_os = "linux")))]
-#[derive(FromPrimitive, PartialEq, Copy, Clone)]
-pub enum ProcessTableSortBy {
-    Pid = 0,
-    User = 1,
-    Priority = 2,
-    Nice = 3,
-    Cpu = 4,
-    MemPerc = 5,
-    Mem = 6,
-    Virt = 7,
-    Status = 8,
-    DiskRead = 9,
-    DiskWrite = 10,
-    Gpu = 11,
-    FB = 12,
-    Cmd = 13,
-}
-
-#[cfg(all(feature = "nvidia", target_os = "linux"))]
-#[derive(FromPrimitive, PartialEq, Copy, Clone)]
-pub enum ProcessTableSortBy {
-    Pid = 0,
-    User = 1,
-    Priority = 2,
-    Nice = 3,
-    Cpu = 4,
-    MemPerc = 5,
-    Mem = 6,
-    Virt = 7,
-    Status = 8,
-    DiskRead = 9,
-    DiskWrite = 10,
-    IOWait = 11,
-    Gpu = 12,
-    FB = 13,
-    Cmd = 14,
-}
-
-#[cfg(all(not(feature = "nvidia"), not(target_os = "linux")))]
-#[derive(FromPrimitive, PartialEq, Copy, Clone)]
-pub enum ProcessTableSortBy {
-    Pid = 0,
-    User = 1,
-    Priority = 2,
-    Nice = 3,
-    Cpu = 4,
-    MemPerc = 5,
-    Mem = 6,
-    Virt = 7,
-    Status = 8,
-    DiskRead = 9,
-    DiskWrite = 10,
-    Cmd = 11,
-}
-
-#[cfg(all(not(feature = "nvidia"), target_os = "linux"))]
 #[derive(FromPrimitive, PartialEq, Copy, Clone)]
 pub enum ProcessTableSortBy {
     Pid = 0,
@@ -195,28 +121,10 @@ pub struct Top {
     pub virt: ValAndPid<u64>,
     pub read: ValAndPid<f64>,
     pub write: ValAndPid<f64>,
-    #[cfg(target_os = "linux")]
     pub iowait: ValAndPid<f64>,
-    #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    pub gpu: ValAndPid<u64>,
-    #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    pub frame_buffer: ValAndPid<u64>,
 }
 impl Top {
-    // fn update(&mut self, zp: &MProcess, tick_rate: &Duration) {
-    //     self.cum_cpu.update(zp.cum_cpu_usage, zp.pid);
-    //     self.cpu.update(zp.cpu_usage, zp.pid);
-    //     self.mem.update(zp.memory, zp.pid);
-    //     self.virt.update(zp.virtual_memory, zp.pid);
-    //     self.read.update(zp.get_read_bytes_sec(tick_rate), zp.pid);
-    //     self.write.update(zp.get_write_bytes_sec(tick_rate), zp.pid);
-    //     #[cfg(target_os = "linux")]
-    //     self.iowait.update(zp.get_io_wait(tick_rate), zp.pid);
-    //     #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    //     self.gpu.update(zp.gpu_usage, zp.pid);
-    //     #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    //     self.frame_buffer.update(zp.fb_utilization, zp.pid);
-    // }
+
 }
 
 pub struct CPUTimeApp {
@@ -261,60 +169,11 @@ pub struct CPUTimeApp {
     pub started: chrono::DateTime<chrono::Local>,
     pub selected_process: Option<Box<MProcess>>,
     pub max_pid_len: usize,
-    pub batteries: Vec<starship_battery::Battery>,
     pub uptime: Duration,
-    // #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    // pub nvml: Option<nvml::Nvml>,
-    // #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    // pub nvml_error: Option<NvmlError>,
-    // #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    // pub nvml_driver_version: Option<String>,
-    // #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    // pub nvml_version: Option<String>,
-    // #[cfg(all(target_os = "linux", feature = "nvidia"))]
-    // pub nvml_cuda_version: Option<String>,
-    // #[cfg(target_os = "linux")]
-    // pub netlink_client: Option<Client>,
 }
 
 impl CPUTimeApp {
     pub fn new(_tick: Duration) -> CPUTimeApp { // TODO: remove the _ when using the variable (_ is there to avoid the warning)
-        debug!("Create Histogram Map");
-        // let histogram_map = HistogramMap::new(Duration::from_secs(60 * 60 * 24), tick, db);
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        let mut ne = None;
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        let mut nvml_cuda_version = None;
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        let mut nvml_version = None;
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        let mut nvml_driver_version = None;
-        #[cfg(all(target_os = "linux", feature = "nvidia"))]
-        let nvml = match nvml::Nvml::init() {
-            Ok(n) => {
-                nvml_driver_version = match n.sys_driver_version() {
-                    Ok(v) => Some(v),
-                    Err(_) => None,
-                };
-                nvml_version = match n.sys_nvml_version() {
-                    Ok(v) => Some(v),
-                    Err(_) => None,
-                };
-                nvml_cuda_version = match n.sys_cuda_driver_version() {
-                    Ok(v) => Some(format!(
-                        "{:}.{:}",
-                        cuda_driver_version_major(v),
-                        cuda_driver_version_minor(v)
-                    )),
-                    Err(_) => None,
-                };
-                Some(n)
-            }
-            Err(e) => {
-                ne = Some(e);
-                None
-            }
-        };
         let mut s = CPUTimeApp {
       //      histogram_map,
             cpus: vec![],
@@ -354,38 +213,17 @@ impl CPUTimeApp {
             started: chrono::Local::now(),
             selected_process: None,
             max_pid_len: get_max_pid_length(),
-            batteries: vec![],
             top_pids: Top::default(),
             uptime: Duration::from_secs(0),
             //gfx_devices: vec![],
 
-            #[cfg(all(target_os = "linux", feature = "nvidia"))]
-            nvml: nvml,
-            #[cfg(all(target_os = "linux", feature = "nvidia"))]
-            nvml_error: ne,
-            #[cfg(all(target_os = "linux", feature = "nvidia"))]
-            nvml_driver_version: nvml_driver_version,
-            #[cfg(all(target_os = "linux", feature = "nvidia"))]
-            nvml_version: nvml_version,
-            #[cfg(all(target_os = "linux", feature = "nvidia"))]
-            nvml_cuda_version: nvml_cuda_version,
-            // #[cfg(target_os = "linux")]
-            // netlink_client: match Client::open() {
-            //     Ok(c) => Some(c),
-            //     Err(_) => {
-            //         debug!("Couldn't open netlink client.");
-            //         None
-            //     }
-            // },
         };
-        debug!("Initial Metrics Update");
         s.system.refresh_all();
         s.system.refresh_all(); // apparently multiple refreshes are necessary to fill in all values.
         s
     }
 
     async fn get_platform(&mut self) {
-        debug!("Updating Platform");
         match host::platform().await {
             Ok(p) => {
                 self.osname = p.system().to_owned();
@@ -410,85 +248,11 @@ impl CPUTimeApp {
         }
     }
 
-    fn get_batteries(&mut self) {
-        debug!("Updating Batteries.");
-        let manager = starship_battery::Manager::new().expect("Couldn't create battery manager");
-        self.batteries = manager
-            .batteries()
-            .expect("Couldn't get batteries")
-            .filter_map(|res| res.ok())
-            .collect();
-    }
-
-    async fn get_nics(&mut self) {
-        debug!("Updating Network Interfaces");
-        self.network_interfaces.clear();
-        let nics = net::nic().await;
-        let nics = match nics {
-            Ok(nics) => nics,
-            Err(_) => {
-                debug!("Couldn't get nic information");
-                return;
-            }
-        };
-        ::futures::pin_mut!(nics);
-        while let Some(n) = nics.next().await {
-            match n {
-                Ok(n) => {
-                    if !n.is_up() || n.is_loopback() {
-                        continue;
-                    }
-                    if n.name().starts_with("utun")
-                        || n.name().starts_with("awd")
-                        || n.name().starts_with("ham")
-                    {
-                        continue;
-                    }
-                    let ip = match n.address() {
-                        Address::Inet(n) => n.to_string(),
-                        _ => String::new(),
-                    }
-                    .trim_end_matches(":0")
-                    .to_string();
-                    if ip.is_empty() {
-                        continue;
-                    }
-                    let dest = match n.destination() {
-                        Some(Address::Inet(d)) => d.to_string(),
-                        _ => String::new(),
-                    };
-                    self.network_interfaces.push(NetworkInterface {
-                        name: n.name().to_owned(),
-                        ip,
-                        dest,
-                    });
-                }
-                Err(_) => println!("Couldn't get information on a nic"),
-            }
-        }
-    }
-
-    async fn update_sensors(&mut self) {
-        self.sensors.clear();
-        for t in self.system.get_components() {
-            if cfg!(target_os = "linux") {
-                if t.get_label().contains("Package id") {
-                    debug!("{:?}", t);
-                    self.sensors.push(Sensor::from(t));
-                }
-            } else if cfg!(target_os = "macos") && t.get_label().contains("CPU") {
-                self.sensors.push(Sensor::from(t));
-            }
-        }
-    }
-
     pub fn select_process(&mut self, highlighted_process: Option<Box<MProcess>>) {
-        debug!("Selected Process.");
         self.selected_process = highlighted_process;
     }
 
     fn update_process_list(&mut self, keep_order: bool) {
-        debug!("Updating Process List");
         let process_list = self.system.get_processes();
         #[cfg(target_os = "linux")]
       //  let client = &self.netlink_client;
@@ -621,7 +385,6 @@ impl CPUTimeApp {
     }
 
     pub fn sort_process_table(&mut self) {
-        debug!("Sorting Process Table");
         let pm = &self.process_map;
         let sorter = MProcess::field_comparator(self.psortby);
         let sortorder = &self.psortorder;
@@ -640,7 +403,6 @@ impl CPUTimeApp {
     }
 
     async fn update_frequency(&mut self) {
-        debug!("Updating Frequency");
         let f = heim::cpu::frequency().await;
         if let Ok(f) = f {
             self.frequency = f.current().get::<megahertz>();
@@ -830,7 +592,6 @@ impl CPUTimeApp {
         // debug!("Updating Metrics");
         self.system.refresh_all();
         self.update_cpu().await;
-        self.update_sensors().await;
 
         self.mem_utilization = self.system.get_used_memory();
         self.mem_total = self.system.get_total_memory();
@@ -849,12 +610,9 @@ impl CPUTimeApp {
         self.update_frequency().await;
         // self.update_disk().await;
         self.get_platform().await;
-        self.get_nics().await;
-        self.get_batteries();
         self.get_uptime().await;
         // self.update_gfx_devices();
         // self.update_gpu_utilization();
-        debug!("Updated Metrics for {} processes.", self.processes.len());
     }
 
     // pub async fn save_state(&mut self) {
