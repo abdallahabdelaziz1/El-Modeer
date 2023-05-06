@@ -181,18 +181,22 @@ pub fn render_process_table(
     }
 
     let mut sort_index = 0;
-    // bool mut found = false;
+    let mut found = false;
      for i in 0..14 { // TODO: make 14 a constant
         let column: Column = FromPrimitive::from_u32(i as u32)
                 .expect("Index not in range for Column enum");
         if proc_columns.contains(&column) {
             if column == app.psortby {
+                found = true;
                 break;
             }
             else {
                 sort_index += 1;
             }
         }
+    }
+    if !found {
+        sort_index = 0;
     }
 
 
