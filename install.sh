@@ -8,7 +8,7 @@ if cargo install --path .; then
 
     echo "El-modeer is installed Successfully!"
 
-    # copy tree to ~/home/el-modeer
+    # copy tree to ~/el-modeer
     if [ ! -d "~/el-modeer/" ] 
     then
         mkdir ~/el-modeer;
