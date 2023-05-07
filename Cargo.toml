@@ -1,14 +1,14 @@
 [package]
 name = "el-modeer"
-version = "0.14.0"
-authors = ["Benjamin Vaisvil"]
+version = "0.0.1"
+authors = ["Abdallah Abdelaziz", "Amer Elsheikh", "Gehad Ahmed"]
 edition = "2018"
-description = "Similar to top or htop but with CPU, Network Usage, and Disk Usage charts."
+description = "Process Manager similar to top or htop but in Rust"
 readme = "README.md"
-homepage = "https://github.com/bvaisvil/zenith"
-repository = "https://github.com/bvaisvil/zenith"
+homepage = "https://github.com/abdallahabdelaziz1/El-Modeer/"
+repository = "https://github.com/abdallahabdelaziz1/El-Modeer/"
 license = "MIT"
-keywords = ["system monitor", "tui", "process monitor", "sysinfo"]
+keywords = ["system monitor", "tui", "process manager", "sysinfo"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = []

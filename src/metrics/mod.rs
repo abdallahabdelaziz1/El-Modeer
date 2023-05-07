@@ -15,28 +15,8 @@ use chrono::Local;
 
 use std::fs;
 use std::path::{Path};
-use sysinfo::{
-    Component, ComponentExt, Disk, DiskExt, ProcessExt, ProcessStatus, ProcessorExt, System, SystemExt,
-};
+use sysinfo::{Disk, DiskExt, ProcessExt, ProcessStatus, ProcessorExt, System, SystemExt};
 use users::{Users, UsersCache};
-
-// #[derive(FromPrimitive, PartialEq, Copy, Clone)]
-// pub enum Column { 
-//     PID = 0,
-//     PPID = 1,
-//     User = 2,
-//     Priority = 3,
-//     Nice = 4,
-//     Status = 5,
-//     TTY = 6,
-//     CPUPercentage = 7,
-//     MemoryPercentage = 8,
-//     Memory = 9,
-//     VirtualMemory = 10,
-//     CPUTime = 11,
-//     StartTime = 12,
-//     CMD = 13,
-// }
 
 #[derive(PartialEq, Eq)]
 pub enum ProcessTableSortOrder {
@@ -54,30 +34,6 @@ impl DiskFreeSpaceExt for Disk {
             return 0.0;
         }
         percent_of(self.get_available_space(), self.get_total_space())
-    }
-}
-
-pub struct NetworkInterface {
-    pub name: String,
-    pub ip: String,
-    pub dest: String,
-}
-
-pub struct Sensor {
-    pub name: String,
-    pub current_temp: f32,
-    pub critical: f32,
-    pub high: f32,
-}
-
-impl From<&Component> for Sensor {
-    fn from(c: &Component) -> Sensor {
-        Sensor {
-            name: c.get_label().to_owned(),
-            current_temp: c.get_temperature(),
-            critical: c.get_critical().unwrap_or(0.0),
-            high: c.get_max(),
-        }
     }
 }
 
@@ -107,12 +63,6 @@ pub struct ValAndPid<T> {
     pub pid: Option<i32>,
 }
 impl<T: PartialOrd> ValAndPid<T> {
-    // fn update(&mut self, new: T, pid: i32) {
-    //     if new > self.val {
-    //         self.val = new;
-    //         self.pid = Some(pid);
-    //     }
-    // }
 }
 
 #[derive(Default, Debug)]
@@ -130,7 +80,6 @@ impl Top {
 }
 
 pub struct CPUTimeApp {
-  //  pub histogram_map: HistogramMap,
     pub cpu_utilization: u64,
     pub mem_utilization: u64,
     pub mem_total: u64,
@@ -148,7 +97,6 @@ pub struct CPUTimeApp {
     pub process_map: HashMap<i32, MProcess>,
     pub psortby: Column,
     pub psortorder: ProcessTableSortOrder,
-    // pub disks: HashMap<String, ZDisk>,
     pub disk_write: u64,
     pub disk_read: u64,
     pub system: System,
@@ -164,9 +112,6 @@ pub struct CPUTimeApp {
     pub version: String,
     pub arch: String,
     pub hostname: String,
-    pub network_interfaces: Vec<NetworkInterface>,
-    pub sensors: Vec<Sensor>,
-    // pub gfx_devices: Vec<GraphicsDevice>,
     pub processor_name: String,
     pub started: chrono::DateTime<chrono::Local>,
     pub selected_process: Option<Box<MProcess>>,
@@ -178,7 +123,6 @@ pub struct CPUTimeApp {
 impl CPUTimeApp {
     pub fn new(tick: Duration) -> CPUTimeApp { 
         let mut s = CPUTimeApp {
-      //      histogram_map,
             cpus: vec![],
             system: System::new_all(),
             cpu_utilization: 0,
@@ -192,7 +136,6 @@ impl CPUTimeApp {
             sleeping_processes: 0,
             stopped_processes: 0,
             zombie_processes: 0,
-          //  disks: HashMap::with_capacity(10),
             net_in: 0,
             net_out: 0,
             processes: Vec::with_capacity(400),
@@ -210,8 +153,6 @@ impl CPUTimeApp {
             version: String::from(""),
             arch: String::from(""),
             hostname: String::from(""),
-            network_interfaces: vec![],
-            sensors: vec![],
             processor_name: String::from(""),
             started: chrono::Local::now(),
             selected_process: None,
@@ -305,10 +246,6 @@ impl CPUTimeApp {
                         None => Local::now(),
                     };
 
-                    // #[cfg(target_os = "linux")]
-                    // zp.update_delay(client);
-
-                    // top.update(zp, &self.histogram_map.tick);
                 } else {
                     let user_name = self
                         .user_cache
@@ -317,9 +254,6 @@ impl CPUTimeApp {
                         .unwrap_or(format!("{:}", process.uid));
                     let mprocess = MProcess::from_user_and_process(user_name, process);
                     self.threads_total += mprocess.threads_total as usize;
-
-                    // top.update(zp, &self.histogram_map.tick);
-
                     self.process_map.insert(mprocess.pid, mprocess);
                 }
             } else {
@@ -330,13 +264,8 @@ impl CPUTimeApp {
                     .unwrap_or(format!("{:}", process.uid));
                 #[allow(unused_mut)]
                 let mut mprocess = MProcess::from_user_and_process(user_name, process);
-                // #[cfg(target_os = "linux")]
-                // mprocess.update_delay(client);
-
+                
                 self.threads_total += mprocess.threads_total as usize;
-
-                // top.update(&mprocess, &self.histogram_map.tick);
-
                 self.process_map.insert(mprocess.pid, mprocess);
             }
             current_pids.insert(*pid);
@@ -390,7 +319,6 @@ impl CPUTimeApp {
         let pm = &self.process_map;
         let sorter = MProcess::field_comparator(self.psortby);
         let sortorder = &self.psortorder;
-        // let tick = self.histogram_map.tick;
         let tick = self.tick;
         self.processes.sort_by(|a, b| {
             let pa = pm.get(a).expect("Error in sorting the process table.");
@@ -415,143 +343,7 @@ impl CPUTimeApp {
         }
     }
 
-    // async fn update_disk(&mut self) {
-    //     debug!("Updating Disks");
-
-    //     static IGNORED_FILE_SYSTEMS: &[&[u8]] = &[
-    //         b"sysfs",
-    //         b"proc",
-    //         b"tmpfs",
-    //         b"cgroup",
-    //         b"cgroup2",
-    //         b"pstore",
-    //         b"squashfs",
-    //         b"iso9660",
-    //     ];
-
-    //     self.system.refresh_disks_list();
-    //     let mut updated: HashMap<String, bool> = HashMap::with_capacity(self.disks.len());
-    //     for k in self.disks.keys() {
-    //         if k == "Total" {
-    //             continue;
-    //         }
-    //         updated.insert(k.to_string(), false);
-    //     }
-
-    //     let mut total_available = 0;
-    //     let mut total_space = 0;
-
-    //     for d in self.system.get_disks().iter() {
-    //         let name = d.get_name().to_string_lossy();
-    //         let mp = d.get_mount_point().to_string_lossy();
-    //         if cfg!(target_os = "linux") {
-    //             let fs = d.get_file_system();
-    //             if IGNORED_FILE_SYSTEMS.iter().any(|ignored| &fs == ignored) {
-    //                 continue;
-    //             }
-    //             if mp.starts_with("/sys")
-    //                 || mp.starts_with("/proc")
-    //                 || mp.starts_with("/run")
-    //                 || mp.starts_with("/dev")
-    //                 || name.starts_with("shm")
-    //                 || name.starts_with("sunrpc")
-    //             {
-    //                 continue;
-    //             }
-    //         }
-    //         let name = get_device_name(d.get_name());
-    //         let mut zd = self.disks.entry(name).or_insert(ZDisk::from_disk(&d));
-    //         zd.size_bytes = d.get_total_space();
-    //         zd.available_bytes = d.get_available_space();
-    //         total_available += zd.available_bytes;
-    //         total_space += zd.size_bytes;
-    //         updated.insert(zd.name.to_string(), true);
-    //         self.histogram_map.add_value_to(
-    //             &HistogramKind::FileSystemUsedSpace(zd.name.to_string()),
-    //             zd.get_used_bytes(),
-    //         );
-    //     }
-    //     for (k, v) in updated.iter() {
-    //         if !v {
-    //             self.disks.remove(k);
-    //         }
-    //     }
-
-    //     self.disk_read = self
-    //         .process_map
-    //         .iter()
-    //         .map(|(_pid, p)| p.get_read_bytes_sec(&self.histogram_map.tick) as u64)
-    //         .sum();
-    //     self.disk_write = self
-    //         .process_map
-    //         .iter()
-    //         .map(|(_pid, p)| p.get_write_bytes_sec(&self.histogram_map.tick) as u64)
-    //         .sum();
-
-    //     get_disk_io_metrics(&mut self.disks).await;
-
-    //     let mut previous_io = IoMetrics {
-    //         read_bytes: 0,
-    //         write_bytes: 0,
-    //     };
-    //     let mut current_io = IoMetrics {
-    //         read_bytes: 0,
-    //         write_bytes: 0,
-    //     };
-
-    //     #[cfg(target_os = "linux")]
-    //     for d in self.disks.values() {
-    //         if d.mount_point.to_string_lossy() != "Total" {
-    //             previous_io += d.previous_io;
-    //             current_io += d.current_io;
-    //         }
-    //     }
-    //     #[cfg(not(target_os = "linux"))]
-    //     for p in self.process_map.values() {
-    //         previous_io.read_bytes += p.prev_read_bytes;
-    //         previous_io.write_bytes += p.prev_write_bytes;
-    //         current_io.read_bytes += p.read_bytes;
-    //         current_io.write_bytes += p.write_bytes;
-    //     }
-
-    //     self.update_disk_histograms(total_available, total_space, previous_io, current_io)
-    //         .await;
-    // }
-
-    // pub async fn update_disk_histograms(
-    //     &mut self,
-    //     total_available: u64,
-    //     total_space: u64,
-    //     previous_io: IoMetrics,
-    //     current_io: IoMetrics,
-    // ) {
-    //     let mut overall = self
-    //         .disks
-    //         .entry("Total".to_string())
-    //         .or_insert(ZDisk::new_total());
-    //     overall.available_bytes = total_available;
-    //     overall.size_bytes = total_space;
-    //     overall.previous_io = previous_io;
-    //     overall.current_io = current_io;
-    //     self.histogram_map.add_value_to(
-    //         &HistogramKind::FileSystemUsedSpace(overall.name.to_string()),
-    //         overall.get_used_bytes(),
-    //     );
-
-    //     for disk in self.disks.values() {
-    //         self.histogram_map.add_value_to(
-    //             &HistogramKind::IoRead(disk.name.to_string()),
-    //             disk.get_read_bytes_sec(&self.histogram_map.tick) as u64,
-    //         );
-    //         self.histogram_map.add_value_to(
-    //             &HistogramKind::IoWrite(disk.name.to_string()),
-    //             disk.get_write_bytes_sec(&self.histogram_map.tick) as u64,
-    //         );
-    //     }
-    // }
-
     pub async fn update_cpu(&mut self) {
-        // debug!("Updating CPU");
         let procs = self.system.get_processors();
         let mut usage: f32 = 0.0;
         self.cpus.clear();
@@ -574,28 +366,9 @@ impl CPUTimeApp {
             usage /= procs.len() as f32;
             self.cpu_utilization = usage as u64;
         }
-        // self.histogram_map
-        //     .add_value_to(&HistogramKind::Cpu, self.cpu_utilization);
     }
 
-    // pub async fn update_networks(&mut self) {
-    //     let mut net_in = 0;
-    //     let mut net_out = 0;
-    //     for (_iface, data) in self.system.get_networks() {
-    //         debug!("iface: {}", _iface);
-    //         net_in += data.get_received();
-    //         net_out += data.get_transmitted();
-    //     }
-    //     self.net_in = net_in;
-    //     self.net_out = net_out;
-    //     self.histogram_map
-    //         .add_value_to(&HistogramKind::NetRx, self.net_in);
-    //     self.histogram_map
-    //         .add_value_to(&HistogramKind::NetTx, self.net_out);
-    // }
-
     pub async fn update(&mut self, keep_order: bool) {
-        // debug!("Updating Metrics");
         self.system.refresh_all();
         self.update_cpu().await;
 
@@ -605,27 +378,9 @@ impl CPUTimeApp {
         self.swap_utilization = self.system.get_used_swap();
         self.swap_total = self.system.get_total_swap();
         
-        
-        // let mem = percent_of(self.mem_utilization, self.mem_total) as u64;
-
-        // self.histogram_map.add_value_to(&HistogramKind::Mem, mem);
-
-
-        // self.update_networks().await;
         self.update_process_list(keep_order);
         self.update_frequency().await;
-        // self.update_disk().await;
         self.get_platform().await;
         self.get_uptime().await;
-        // self.update_gfx_devices();
-        // self.update_gpu_utilization();
     }
-
-    // pub async fn save_state(&mut self) {
-    //     self.histogram_map.save_histograms();
-    // }
-
-    // pub fn writes_db_store(&self) -> bool {
-    //     self.histogram_map.writes_db_store()
-    // }
 }

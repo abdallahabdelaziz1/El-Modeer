@@ -1,6 +1,3 @@
-/**
- * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
- */
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
@@ -13,10 +10,6 @@ use std::fmt;
 
 #[derive(FromPrimitive, PartialEq, Copy, Clone, Debug, Ord, PartialOrd, Eq)]
 pub enum Section {
-    // Cpu = 0,
-    // Network = 1,
-    // Disk = 2,
-    // Graphics = 3,
     SystemInfo = 0,
     Process = 1,
 }
@@ -24,10 +17,6 @@ pub enum Section {
 impl fmt::Display for Section {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let name = match self {
-            // Section::Cpu => " CPU",
-            // Section::Disk => " Disk",
-            // Section::Graphics => " Graphics",
-            // Section::Network => " Network",
             Section::SystemInfo => " System Info",
             Section::Process => " Process",
         };
@@ -87,8 +76,6 @@ impl<'a> SectionMGRList<'a> {
 }
 
 pub fn render_section_mgr(list: &mut SectionMGRList<'_>, area: Rect, f: &mut Frame<'_, MBackend>) {
-    // debug!("Rendering Section Manager");
-
     let layout = Layout::default()
         .margin(5)
         .direction(Direction::Vertical)
@@ -104,7 +91,7 @@ pub fn render_section_mgr(list: &mut SectionMGRList<'_>, area: Rect, f: &mut Fra
     let header_style = Style::default().fg(Color::Green);
     let t = vec![Span::styled("Options", header_style)];
     let help = vec![Span::styled(
-        "Navigate [↑/↓] Toggle [Space] Return [F1/i]",
+        "Navigate [↑/↓] Toggle [Space] Return [i]",
         header_style,
     )];
     Paragraph::new(Spans::from(t))

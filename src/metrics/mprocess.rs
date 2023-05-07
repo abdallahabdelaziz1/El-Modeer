@@ -1,17 +1,8 @@
-/**
- * Copyright 2019-2020, Benjamin Vaisvil and the zenith contributors
- */
-// use crate::metrics::Column;
 use crate::renderer::column::Column;
 use heim::process;
 use heim::process::ProcessError;
-#[cfg(target_os = "linux")]
 use libc::getpriority;
 use libc::{id_t, setpriority};
-
-#[cfg(target_os = "linux")]
-// use linux_taskstats::Client;
-
 use std::cmp::Ordering::{self, Equal};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::path::{PathBuf};
@@ -24,20 +15,6 @@ use chrono::prelude::DateTime;
 use chrono::Duration as CDuration;
 use chrono::Local;
 use crate::{convert_result_to_string, convert_error_to_string};
-
-
-// pub fn get_tty(process: &sysinfo::Process) -> Option<String> {
-//     let pid = process.pid();
-//     let tty_path = format!("/proc/{}/fd/0", pid);
-//     let path = PathBuf::from(&tty_path);
-
-//     if let Ok(target) = read_link(&path) {
-//         if let Some(tty_os_str) = target.file_name() {
-//             return Some(tty_os_str.to_string_lossy().into_owned());
-//         }
-//     }
-//     None
-// }
 
 pub fn get_tty(process: &sysinfo::Process) -> String {
     let pid = process.pid();
@@ -104,7 +81,7 @@ impl MProcess {
             user_name,
             pid: process.pid(),
             ppid: process.parent().unwrap_or_else(|| 1), // if you can't get the parent, it's init
-            tty: get_tty(process), // TODO: get tty
+            tty: get_tty(process), 
             memory: process.memory(),
             cpu_usage: process.cpu_usage(),
             command: process.cmd().to_vec(),
@@ -123,7 +100,7 @@ impl MProcess {
             last_updated: SystemTime::now(),
             end_time: None,
             start_time: process.start_time(),
-            cpu_time: process.cpu_time(),
+            cpu_time: process.cpu_time(), // TODO: check the number again 
             gpu_usage: 0,
             fb_utilization: 0,
             enc_utilization: 0,
@@ -141,10 +118,7 @@ impl MProcess {
     }
     pub fn get_write_bytes_sec(&self, tick_rate: &Duration) -> f64 {
         (self.write_bytes - self.prev_write_bytes) as f64 / tick_rate.as_secs_f64()
-    }
-
-
-    
+    }    
     
     pub async fn suspend(&self) -> String {
         match process::get(self.pid).await {
@@ -180,20 +154,14 @@ impl MProcess {
 
     pub fn get_run_duration(&self) -> CDuration {
         let start_time = DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(self.start_time));
-        // let et = match self.end_time {
-        //     Some(t) => DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(t)),
-        //     None => Local::now(),
-        // };
         self.et - start_time
     }
 
-    #[cfg(target_os = "linux")]
     pub fn get_io_wait(&self, tick_rate: &Duration) -> f64 {
         ((self.io_delay.as_secs_f64() - self.prev_io_delay.as_secs_f64()) / tick_rate.as_secs_f64())
             * 100.0
     }
 
-    #[cfg(target_os = "linux")]
     pub fn get_total_io_wait(&self) -> f64 {
         let process_duration = self
             .get_run_duration()
@@ -202,14 +170,12 @@ impl MProcess {
         (self.io_delay.as_secs_f64() / process_duration.as_secs_f64()) * 100.0
     }
 
-    #[cfg(target_os = "linux")]
     pub fn get_swap_wait(&self, tick_rate: &Duration) -> f64 {
         ((self.swap_delay.as_secs_f64() - self.prev_swap_delay.as_secs_f64())
             / tick_rate.as_secs_f64())
             * 100.0
     }
 
-    #[cfg(target_os = "linux")]
     pub fn get_total_swap_wait(&self) -> f64 {
         let process_duration = self
             .get_run_duration()
@@ -261,7 +227,6 @@ impl MProcess {
             }
             Column::Priority => |pa, pb, _tick| pa.priority.cmp(&pb.priority),
             Column::Nice => |pa, pb, _tick| pa.nice.cmp(&pb.nice),
-            
             Column::VirtualMemory => |pa, pb, _tick| pa.virtual_memory.cmp(&pb.virtual_memory),
             Column::CPUTime => |pa, pb, _tick| pa.cpu_time.cmp(&pb.cpu_time),
             Column::StartTime => |pa, pb, _tick| pa.start_time.cmp(&pb.start_time),
