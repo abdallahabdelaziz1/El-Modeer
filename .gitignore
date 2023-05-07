@@ -2,3 +2,33 @@
 .idea
 target
 build
+
+tree/Modeer/.gitignore
+
+# Logs
+tree/Modeer/logs
+tree/Modeer/*.log
+tree/Modeer/npm-debug.log*
+tree/Modeer/yarn-debug.log*
+tree/Modeer/yarn-error.log*
+tree/Modeer/pnpm-debug.log*
+tree/Modeer/lerna-debug.log*
+
+tree/Modeer/node_modules
+tree/Modeer/dist
+tree/Modeer/dist-ssr
+tree/Modeer/*.local
+
+# Editor directories and files
+tree/Modeer/.vscode/*
+tree/Modeer/!.vscode/extensions.json
+tree/Modeer/.idea
+tree/Modeer/.DS_Store
+tree/Modeer/*.suo
+tree/Modeer/*.ntvs*
+tree/Modeer/*.njsproj
+tree/Modeer/*.sln
+tree/Modeer/*.sw?
+
+
+
