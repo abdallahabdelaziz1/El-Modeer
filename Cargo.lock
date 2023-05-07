@@ -450,7 +450,7 @@ checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
 name = "el-modeer"
-version = "0.14.0"
+version = "0.0.1"
 dependencies = [
  "byte-unit",
  "chrono",
@@ -1414,7 +1414,7 @@ dependencies = [
 [[package]]
 name = "sysinfo"
 version = "0.15.1"
-source = "git+https://github.com/bvaisvil/sysinfo.git?branch=zenith_changes_15.1#bcff3dc5c5b53320c53984cef5773ed850001fd8"
+source = "git+https://github.com/GehadSalemFekry/sysinfo?branch=modeer_changes#53fc47152001e80659054fc06ab005ffab108438"
 dependencies = [
  "cfg-if 0.1.10",
  "doc-comment",

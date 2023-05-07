@@ -8,14 +8,10 @@ use tui::Frame;
 use tui::widgets::{Block, Borders, Wrap};
 use crate::util::to_gb;
 
-
 pub fn render_system_info(
     app: &CPUTimeApp,
     area: Rect,
     f: &mut Frame<'_, MBackend>,
-    border_style: Style,
-    // zf: &u32,
-    // offset: &usize,
 ) {
     let bold_style = Style::default().add_modifier(Modifier::BOLD); 
 
@@ -70,8 +66,7 @@ pub fn render_system_info(
     Paragraph::new(text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .border_style(border_style)
-            .title(Span::styled("System Info", border_style)))
+            .title("System Info"))
         .style(Style::default())
         .wrap(Wrap { trim: true }).render(f, area);
 }

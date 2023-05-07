@@ -1,10 +1,13 @@
 use super::{percent_of, Render, MBackend};
 use crate::float_to_byte_string;
+use crate::constants::NUMBER_OF_COLUMNS;
 use crate::metrics::mprocess::{ProcessStatusExt, MProcess};
 use crate::metrics::{CPUTimeApp, ProcessTableSortOrder};
+use crate::renderer::column::Column;
 use byte_unit::{Byte, ByteUnit};
 use chrono::prelude::DateTime;
 use chrono::Local;
+use num_traits::FromPrimitive;
 use std::borrow::Cow;
 use std::time::{Duration, UNIX_EPOCH};
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -19,9 +22,10 @@ pub fn render_process_table(
     area: Rect,
     process_table_start: usize,
     f: &mut Frame<'_, MBackend>,
-    border_style: Style,
+    proc_columns: &Vec<Column>,
     show_paths: bool,
     show_find: bool,
+    show_find_cat: bool,
     show_kill: bool,
     show_suspend: bool,
     show_resume: bool,
@@ -78,82 +82,35 @@ pub fn render_process_table(
             } else {
                 String::from("")
             };
-            let mut cpu_usage =
-                set_process_row_style(p.pid, app.top_pids.cpu.pid, format!("{:>5.1}", p.cpu_usage));
-            match &app.cum_cpu_process {
-                Some(top) => {
-                    if top.pid == p.pid {
-                        cpu_usage = cpu_usage.style(Style::default().fg(Color::Magenta));
-                    }
+
+            // Loop over columns and add cells to the row
+            let mut row = vec![];
+
+            for column in proc_columns {
+                let cpu_time = format!(
+                    "{:0>2}:{:0>2}:{:0>2}",
+                    (p.cpu_time / 3600),
+                    (p.cpu_time / 60) % 60,
+                    p.cpu_time % 60
+                );
+                match column {
+                    Column::PID => row.push(Cell::from(format!("{: >width$}", p.pid, width = app.max_pid_len))),
+                    Column::PPID => row.push(Cell::from(format!("{: >width$}", p.ppid, width = app.max_pid_len))),
+                    Column::User => row.push(Cell::from(format!("{: <10}", p.user_name))),
+                    Column::Priority => row.push(Cell::from(format!("{: <3}", p.priority))),
+                    Column::Nice => row.push(Cell::from(format!("{: <3}", p.nice))),
+                    Column::Status => row.push(Cell::from(format!("{:1}", p.status.to_single_char()))),
+                    Column::TTY => row.push(Cell::from(format!("{: <10}", p.tty))),
+                    Column::CPUPercentage => row.push(Cell::from(format!("{:>5.1}", p.cpu_usage))),
+                    Column::MemoryPercentage => row.push(Cell::from(format!("{:>5.1}", percent_of(p.memory, app.mem_total)))),
+                    Column::Memory => row.push(Cell::from(format!("{:>8}", float_to_byte_string!(p.memory as f64, ByteUnit::B).replace('B', "")))),
+                    Column::VirtualMemory => row.push(Cell::from(format!("{:>8}", float_to_byte_string!(p.virtual_memory as f64, ByteUnit::KB).replace('B', "")))),
+                    Column::CPUTime => row.push(Cell::from(cpu_time)),
+                    Column::StartTime => row.push(Cell::from(format!("{:>5.1}", DateTime::<Local>::from(UNIX_EPOCH + Duration::from_secs(p.start_time))))),
+                    Column::CMD => row.push(Cell::from(format!("{:}{:}", p.name, cmd_string))),
                 }
-                None => (),
-            };
-            // TODO: update to be dynamic
-            // make a loop and push cells to the vector
-            let mut row = vec![
-                Cell::from(format!("{: >width$}", p.pid, width = app.max_pid_len)),
-                Cell::from(format!("{: <10}", p.user_name)),
-                Cell::from(format!("{: <3}", p.priority)),
-                Cell::from(format!("{: <3}", p.nice)),
-                cpu_usage,
-                set_process_row_style(
-                    p.pid,
-                    app.top_pids.mem.pid,
-                    format!("{:>5.1}", percent_of(p.memory, app.mem_total)),
-                ),
-                set_process_row_style(
-                    p.pid,
-                    app.top_pids.mem.pid,
-                    format!(
-                        "{:>8}",
-                        float_to_byte_string!(p.memory as f64, ByteUnit::KB).replace('B', "")
-                    ),
-                ),
-                set_process_row_style(
-                    p.pid,
-                    app.top_pids.virt.pid,
-                    format!(
-                        "{:>8}",
-                        float_to_byte_string!(p.virtual_memory as f64, ByteUnit::KB)
-                            .replace('B', "")
-                    ),
-                ),
-                Cell::from(format!("{:1}", p.status.to_single_char())),
-                set_process_row_style(
-                    p.pid,
-                    app.top_pids.read.pid,
-                    format!(
-                        "{:>8}",
-                        float_to_byte_string!(
-                            p.get_read_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this configurable
-                            ByteUnit::B
-                        )
-                        .replace('B', "")
-                    ),
-                ),
-                set_process_row_style(
-                    p.pid,
-                    app.top_pids.write.pid,
-                    format!(
-                        "{:>8}",
-                        float_to_byte_string!(
-                            p.get_write_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this configurable
-                            ByteUnit::B
-                        )
-                        .replace('B', "")
-                    ),
-                ),
-            ];
-
-            #[cfg(target_os = "linux")]
-            row.push(set_process_row_style(
-                p.pid,
-                app.top_pids.iowait.pid,
-                format!("{:>5.1}", p.get_io_wait(&Duration::from_millis(tick_rate))),
-            ));
-        
-            row.push(Cell::from(format!("{:}{:}", p.name, cmd_string)));
-
+            }
+            
             let row = Row::new(row);
 
             if i == highlighted_row {
@@ -169,21 +126,27 @@ pub fn render_process_table(
         })
         .collect();
 
-    // TODO: Make sure to update the header as well
-    let mut header = vec![
-        format!("{:<width$}", "PID", width = app.max_pid_len + 1),
-        String::from("USER       "),
-        String::from("P   "),
-        String::from("N   "),
-        String::from("CPU%  "),
-        String::from("MEM%  "),
-        String::from("MEM     "),
-        String::from("VIRT     "),
-        String::from("S "),
-        String::from("READ/s   "),
-        String::from("WRITE/s  "),
-        String::from("IOWAIT% "),
-    ];
+    // Loop over columns and add cells to the row
+    let mut header = vec![];
+
+    for column in proc_columns {
+        match column {
+            Column::PID => header.push(format!("{:<width$}", "PID", width = app.max_pid_len + 1)),
+            Column::PPID => header.push(format!("{:<width$}", "PPID", width = app.max_pid_len + 1)),
+            Column::User => header.push(String::from("USER            ")),
+            Column::Priority => header.push(String::from("P   ")),
+            Column::Nice => header.push(String::from("N  ")),
+            Column::Status => header.push(String::from("S ")),
+            Column::TTY => header.push(String::from("TTY    ")),
+            Column::CPUPercentage => header.push(String::from("CPU%  ")),
+            Column::MemoryPercentage => header.push(String::from("MEM%  ")),
+            Column::Memory => header.push(String::from("MEM     ")),
+            Column::VirtualMemory => header.push(String::from("VIRT     ")),
+            Column::CPUTime => header.push(String::from("CPUTIME  ")),
+            Column::StartTime => header.push(String::from("STARTTIME           ")),
+            _ => {}
+        }
+    }
 
     let mut widths = Vec::with_capacity(header.len() + 1);
     let mut used_width = 0;
@@ -194,20 +157,42 @@ pub fn render_process_table(
     }
     let cmd_width = f.size().width.saturating_sub(used_width).saturating_sub(3);
     let cmd_header = format!("{:<width$}", "CMD", width = cmd_width as usize);
-    widths.push(Constraint::Min(cmd_width));
-    header.push(cmd_header);
+    
+    if proc_columns.contains(&Column::CMD) {
+        widths.push(Constraint::Min(cmd_width));
+        header.push(cmd_header);
+    }
 
-    header[app.psortby as usize].pop();
+    let mut sort_index = 0;
+    let mut found = false;
+     for i in 0..NUMBER_OF_COLUMNS { // TODO: make 14 a constant
+        let column: Column = FromPrimitive::from_u32(i as u32)
+                .expect("Index not in range for Column enum");
+        if proc_columns.contains(&column) {
+            if column == app.psortby {
+                found = true;
+                break;
+            }
+            else {
+                sort_index += 1;
+            }
+        }
+    }
+    if !found {
+        sort_index = 0;
+    }
+
+    header[sort_index].pop();
     let sort_ind = match app.psortorder {
         ProcessTableSortOrder::Ascending => '↑',
         ProcessTableSortOrder::Descending => '↓',
     };
-    header[app.psortby as usize].insert(0, sort_ind); //sort column indicator
+    header[sort_index].insert(0, sort_ind); //sort column indicator
     let header_row: Vec<Cell> = header
         .iter()
         .enumerate()
         .map(|(i, c)| {
-            if i == app.psortby as usize {
+            if i == sort_index {
                 Cell::from(c.as_str()).style(
                     Style::default()
                         .bg(Color::Gray)
@@ -221,7 +206,10 @@ pub fn render_process_table(
         .collect();
     let title = if show_find {
         format!("[ESC] Clear, Find: {:}", filter)
-    } else if !filter.is_empty() {
+    } else if show_find_cat {
+        format!("[ESC] Clear, Category: {:}", filter)
+    }
+    else if !filter.is_empty() {
         format!("Filtered Results: {:}, [/] to change/clear", filter)
     } else if show_kill {
         format!("[ESC] Clear, PID to kill: {:}{}", action_pid, process_table_message)
@@ -235,15 +223,14 @@ pub fn render_process_table(
         format!("[ESC] Clear, set refresh rate in millis: {:}{}", new_rate, process_table_message)
     }
      else {
-        format!("Freeze [f] Navigate [↑/↓] Sort Col [,/.] Asc/Dec [;] Filter [/] Kill [k] Suspend [s] Resume [r] Nice [n]")
+        format!("Freeze [f] Sort Col [,/.] Asc/Dec [;] Filter [/] Category [c] Kill [k] Suspend [s] Resume [r] Nice [n]")
     };
 
     Table::new(rows)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(border_style)
-                .title(Span::styled(title, border_style)),
+                .title(title),
         )
         .widths(widths.as_slice())
         .column_spacing(0)
@@ -284,16 +271,14 @@ pub fn render_process(
     app: &CPUTimeApp,
     layout: Rect,
     f: &mut Frame<'_, MBackend>,
-    border_style: Style,
     process_message: &Option<String>,
     p: &MProcess,
     freeze: bool,
     tick_rate: u64,
 ) {
     Block::default()
-        .title(Span::styled(format!("Process: {0}", p.name), border_style))
+        .title(format!("Process: {0}", p.name))
         .borders(Borders::ALL)
-        .border_style(border_style)
         .render(f, layout);
     let v_sections = Layout::default()
         .direction(Direction::Vertical)
@@ -310,8 +295,6 @@ pub fn render_process(
             Style::default().bg(Color::DarkGray).fg(Color::White),
         ))
         .render(f, v_sections[0]);
-
-    //Block::default().borders(Borders::LEFT).render(f, h_sections[1]);
 
     let alive = if p.end_time.is_some() {
         format!(
@@ -337,10 +320,7 @@ pub fn render_process(
         ]),
         Spans::from(vec![
             Span::raw("PID:                   "),
-            Span::styled(
-                format!("{:>width$}", &p.pid, width = app.max_pid_len),
-                rhs_style,
-            ),
+            Span::styled(format!("{:}", &p.pid), rhs_style),
         ]),
         Spans::from(vec![
             Span::raw("Command:               "),
@@ -366,11 +346,11 @@ pub fn render_process(
         ]),
         Spans::from(vec![
             Span::raw("CPU Usage:             "),
-            Span::styled(format!("{:>7.2} %", &p.cpu_usage), rhs_style),
+            Span::styled(format!("{:.2} %", &p.cpu_usage), rhs_style),
         ]),
         Spans::from(vec![
             Span::raw("Threads:               "),
-            Span::styled(format!("{:>7}", &p.threads_total), rhs_style),
+            Span::styled(format!("{:}", &p.threads_total), rhs_style),
         ]),
         Spans::from(vec![
             Span::raw("Status:                "),
@@ -378,16 +358,16 @@ pub fn render_process(
         ]),
         Spans::from(vec![
             Span::raw("Priority:              "),
-            Span::styled(format!("{:>7}", p.priority), rhs_style),
+            Span::styled(format!("{:}", p.priority), rhs_style),
         ]),
         Spans::from(vec![
             Span::raw("Nice:                  "),
-            Span::styled(format!("{:>7}", p.nice), rhs_style),
+            Span::styled(format!("{:}", p.nice), rhs_style),
         ]),
         Spans::from(vec![
             Span::raw("MEM Usage:             "),
             Span::styled(
-                format!("{:>7.2} %", percent_of(p.memory, app.mem_total)),
+                format!("{:.2} %", percent_of(p.memory, app.mem_total)),
                 rhs_style,
             ),
         ]),
@@ -395,7 +375,7 @@ pub fn render_process(
             Span::raw("Total Memory:          "),
             Span::styled(
                 format!(
-                    "{:>10}",
+                    "{:}",
                     float_to_byte_string!(p.memory as f64, ByteUnit::KB)
                 ),
                 rhs_style,
@@ -405,7 +385,7 @@ pub fn render_process(
             Span::raw("Disk Read:             "),
             Span::styled(
                 format!(
-                    "{:>10} {:}/s",
+                    "{:} {:}/s",
                     float_to_byte_string!(p.read_bytes as f64, ByteUnit::B),
                     float_to_byte_string!(
                         p.get_read_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this a setting
@@ -419,7 +399,7 @@ pub fn render_process(
             Span::raw("Disk Write:            "),
             Span::styled(
                 format!(
-                    "{:>10} {:}/s",
+                    "{:} {:}/s",
                     float_to_byte_string!(p.write_bytes as f64, ByteUnit::B),
                     float_to_byte_string!(
                         p.get_write_bytes_sec(&Duration::from_millis(tick_rate)), // TODO: make this a setting
@@ -429,55 +409,33 @@ pub fn render_process(
                 rhs_style,
             ),
         ]),
+        Spans::from(vec![
+            Span::raw("IO Wait:               "),
+            Span::styled(
+                format!(
+                    "{:.2} % ({:.2} %)",
+                    p.get_io_wait(&Duration::from_millis(tick_rate)), // TODO: make this a setting
+                    p.get_total_io_wait()
+                ),
+                rhs_style,
+            ),
+        ]),
+        Spans::from(vec![
+            Span::raw("Swap Wait:             "),
+            Span::styled(
+                format!(
+                    "{:.2} % ({:.2} %)",
+                    p.get_swap_wait(&Duration::from_millis(tick_rate)), // TODO: make this a setting
+                    p.get_total_swap_wait()
+                ),
+                rhs_style,
+            ),
+        ]),
     ];
 
     let frozen_text = vec![Spans::from(vec![
         Span::styled("  FROZEN  ", Style::default().fg(Color::White).bg(Color::Blue).add_modifier(Modifier::BOLD)),
     ])];
-
-    // if !app.gfx_devices.is_empty() {
-    //     text.push(Spans::from(vec![
-    //         Span::raw("SM Util:            "),
-    //         Span::styled(format!("{:7.2} %", p.sm_utilization as f64), rhs_style),
-    //     ]));
-    //     text.push(Spans::from(vec![
-    //         Span::raw("Frame Buffer:       "),
-    //         Span::styled(format!("{:7.2} %", p.fb_utilization as f64), rhs_style),
-    //     ]));
-    //     text.push(Spans::from(vec![
-    //         Span::raw("Encoder Util:       "),
-    //         Span::styled(format!("{:7.2} %", p.enc_utilization as f64), rhs_style),
-    //     ]));
-    //     text.push(Spans::from(vec![
-    //         Span::raw("Decoder Util:       "),
-    //         Span::styled(format!("{:7.2} %", p.dec_utilization as f64), rhs_style),
-    //     ]));
-    // }
-
-    #[cfg(target_os = "linux")]
-    text.push(Spans::from(vec![
-        Span::raw("IO Wait:               "),
-        Span::styled(
-            format!(
-                "{:>7.2} % ({:>7.2} %)",
-                p.get_io_wait(&Duration::from_millis(tick_rate)), // TODO: make this a setting
-                p.get_total_io_wait()
-            ),
-            rhs_style,
-        ),
-    ]));
-    #[cfg(target_os = "linux")]
-    text.push(Spans::from(vec![
-        Span::raw("Swap Wait:             "),
-        Span::styled(
-            format!(
-                "{:>7.2} % ({:>7.2} %)",
-                p.get_swap_wait(&Duration::from_millis(tick_rate)), // TODO: make this a setting
-                p.get_total_swap_wait()
-            ),
-            rhs_style,
-        ),
-    ]));
 
     if text.len() > v_sections[1].height as usize * 3 {
         let h_sections = Layout::default()
@@ -530,13 +488,16 @@ pub fn render_process(
     }
 }
 
-pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str) -> Cow<'a, [i32]> {
+pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str, show_find_cat: bool) -> Cow<'a, [i32]> {
     if filter.is_empty() {
         return Cow::Borrowed(&app.processes);
     }
 
     let filter_lc = filter.to_lowercase();
-    let results: Vec<i32> = app
+    #[allow(unused_assignments)]
+    let mut results : Vec<i32> = Vec::new();
+    if !show_find_cat {
+        results = app
         .processes
         .iter()
         .filter(|pid| {
@@ -548,25 +509,27 @@ pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str) -> Cow<'a, [i
                 || p.exe.to_lowercase().contains(&filter_lc)
                 || p.command.join(" ").to_lowercase().contains(&filter_lc)
                 || format!("{:}", p.pid).contains(&filter_lc)
+                || p.status.to_string().to_lowercase().contains(&filter_lc)
+                || p.user_name.to_lowercase().contains(&filter_lc)
         })
         .copied()
         .collect();
-    results.into()
-}
-
-fn set_process_row_style<'a>(
-    current_pid: i32,
-    test_pid: Option<i32>,
-    row_content: String,
-) -> Cell<'a> {
-    match test_pid {
-        Some(p) => {
-            if p == current_pid {
-                Cell::from(row_content).style(Style::default().fg(Color::Red))
-            } else {
-                Cell::from(row_content)
-            }
-        }
-        None => Cell::from(row_content),
     }
+    else{
+        results = app
+        .processes
+        .iter()
+        .filter(|pid| {
+            let p = app
+                .process_map
+                .get(pid)
+                .expect("Pid present in processes but not in map.");
+            p.status.to_string().to_lowercase().contains(&filter_lc)
+        })
+        .copied()
+        .collect();
+
+    }
+   
+    results.into()
 }

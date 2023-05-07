@@ -1,8 +1,5 @@
-/**
- * Copyright 2019-2022, Benjamin Vaisvil and the zenith contributors
- */
 use crate::metrics::*;
-use crate::renderer::{HistoryRecording, Render, MBackend};
+use crate::renderer::{Render, MBackend};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
@@ -13,7 +10,6 @@ pub fn render_help(
     _app: &CPUTimeApp,
     area: Rect,
     f: &mut Frame<'_, MBackend>,
-    history_recording: HistoryRecording,
 ) {
     let header_style = Style::default().fg(Color::Green);
     let main_style = Style::default();
@@ -23,14 +19,10 @@ pub fn render_help(
         ["h    ", "    Toggle this help screen\n"],
         ["q    ", "    Quit and exit El-Modeer\n"],
         ["f    ", "    Freeze refreshing\n"],
-        ["<TAB>", "    Changes highlighted section\n"],
-        ["e    ", "    Expands highlighted section\n"],
-        ["m    ", "    Shrinks highlighted section\n"],
-        ["F1   ", "    Show Section Selection Menu\n"],
-        ["-    ", "    Zoom chart out\n"],
-        ["+    ", "    Zoom chart in\n"],
-        ["←    ", "    Move back in time\n"],
-        ["→    ", "    Move forward In time\n"],
+        ["i    ", "    Show Section Selection Menu\n"],
+        ["o    ", "    Show Column Selection Menu of the Process Table\n"],
+        ["←    ", "    Change the Sorting Column to the Next one\n"],
+        ["→    ", "    Change the Sorting Column to the Previous one\n"],
         ["`    ", "    Reset charts to current\n"],
     ];
 
@@ -46,8 +38,13 @@ pub fn render_help(
         [",     ", "    Cycle columns left\n"],
         [".     ", "    Cycle columns right\n"],
         ["p     ", "    Toggle paths on/off\n"],
-        ["/     ", "    Toggle filter mode\n"],
-        ["<ESC> ", "    Leave filter mode\n"],
+        ["/     ", "    Enter filter mode\n"],
+        ["c     ", "    Enter filter by Category mode\n"],
+        ["k     ", "    Kill a process using its PID\n"],
+        ["s     ", "    Suspend (stop) a process using its PID\n"],
+        ["r     ", "    Resume a (stopped) process using its PID\n"],
+        ["n     ", "    Nice a process (change its priority) using its PID and the new nice value\n"],
+        ["<ESC> ", "    Leave any action mode\n"],
     ];
 
     let mut t = vec![Spans::from(vec![Span::styled(
@@ -73,26 +70,6 @@ pub fn render_help(
             Span::styled(*key, key_style),
             Span::styled(*text, main_style),
         ]));
-    }
-
-    let not_recording_reason = match history_recording {
-        // HistoryRecording::On => None,
-        HistoryRecording::UserDisabled => {
-            Some("because zenith was started with the `--disable_history` flag\n")
-        }
-        // HistoryRecording::OtherInstancePrevents => {
-        //     Some("because another zenith instance was already running\n")
-        // }
-    };
-
-    if let Some(reason) = not_recording_reason {
-        t.push(Spans::from(vec![Span::styled("", header_style)]));
-        for s in ["Recorded data is not being saved to the database\n", reason].iter() {
-            t.push(Spans::from(vec![Span::styled(
-                *s,
-                Style::default().fg(Color::Yellow),
-            )]));
-        }
     }
 
     let help_height = t.len() as u16;

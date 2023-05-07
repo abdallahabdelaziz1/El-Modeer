@@ -1,18 +1,12 @@
 #![allow(dead_code)]
-/**
- * Copyright 2019-2020, Benjamin Vaisvil and the zenith contributors
- */
 use crate::constants::DEFAULT_TICK;
 use crossterm::{event, event::Event as CEvent, event::KeyCode as Key, event::KeyEvent};
 use signal_hook::consts::signal::{SIGABRT, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
-// use std::fs::{remove_file, File};
-// use std::io::Write;
 use std::path::{Path};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
-///use std::mem::replace;
 
 pub enum Event<I> {
     Input(I),
@@ -102,123 +96,15 @@ impl Events {
         }
     }
 
-
-    // // pub fn set_tick_rate(&mut self, tick_rate: Duration) {
-    // //     // Update the tick_rate in the config struct
-    // //     let mut config = Config::default();
-    // //     config.tick_rate = tick_rate;
-
-    // //     // Stop the old tick_handle thread
-    // //     self.tick_handle.thread().unpark();
-
-    // //     // Spawn a new tick_handle thread with the updated config
-    // //     let tx = self.rx.clone();
-    // //     self.tick_handle = thread::spawn(move || {
-    // //         let tx = tx.clone();
-    // //         let mut count: u64 = 0;
-    // //         loop {
-    // //             tx.send(Event::Tick).expect("Couldn't send event.");
-    // //             count += 1;
-    // //             if count % 60 == 0 {
-    // //                 tx.send(Event::Save).expect("Couldn't send event");
-    // //             }
-    // //             thread::sleep(config.tick_rate);
-    // //         }
-    // //     });
-    // // }
-
-    // pub fn set_tick_rate(&mut self, tick_rate: Duration) {
-    //     let (tx, rx) = mpsc::channel();
-    //     let tick_handle = thread::spawn(move || {
-    //         let tx = tx.clone();
-    //         let mut count: u64 = 0;
-    //         loop {
-    //             tx.send(Event::Tick).expect("Couldn't send event.");
-    //             count += 1;
-    //             if count % 60 == 0 {
-    //                 tx.send(Event::Save).expect("Couldn't send event");
-    //             }
-    //             thread::sleep(tick_rate);
-    //         }
-    //     });
-    //     let _ = replace(&mut self.rx, rx); // ignore error
-    //     let _ = replace(&mut self.tick_handle, tick_handle); // ignore error
-    // }
-
-    
-    
-
     pub fn next(&self) -> Result<Event<KeyEvent>, mpsc::RecvError> {
         self.rx.recv()
     }
 }
 
-
-// pub fn change_tick_handle(&self, tick_rate:Duration){
-//     let (tx, rx) = mpsc::channel();
-//     self.tick_handle = {
-//         let tx :  std::sync::mpsc::Sender<T> = tx.clone();
-//         thread::spawn(move || {
-//             let tx = tx.clone();
-//             let mut count: u64 = 0;
-//             loop {
-//                 tx.send(Event::Tick).expect("Couldn't send event.");
-//                 count += 1;
-//                 if count % 60 == 0 {
-//                     tx.send(Event::Save).expect("Couldn't send event");
-//                 }
-//                 thread::sleep(tick_rate);
-//             }
-//         })
-//     };
-
-// }
-
-// /// Keeps a file open exclusively
-// /// Removes the file when dropped
-// pub struct Lockfile {
-//     file: File,
-//     path: PathBuf,
-// }
-
-// impl Lockfile {
-//     /// Tries to open the file creating if it does not exist
-//     /// Fails if zenith is already running using the same lockfile
-//     pub async fn new(main_pid: u32, path: &Path) -> Option<Self> {
-//         if is_zenith_running(path).await {
-//             debug!("{}", path.to_string_lossy());
-//             return None;
-//         }
-
-//         let mut file = File::create(path).ok()?;
-
-//         file.write_all(main_pid.to_string().as_bytes()).ok()?;
-
-//         Some(Self {
-//             file,
-//             path: path.into(),
-//         })
-//     }
-// }
-
-// impl Drop for Lockfile {
-//     fn drop(&mut self) {
-//         debug!("Removing Lock");
-//         let res = remove_file(&self.path);
-//         if let Err(e) = res {
-//             error!(
-//                 "Error deleting lockfile: path={}, error={:?}",
-//                 self.path.display(),
-//                 e
-//             );
-//         }
-//     }
-// }
-
-async fn is_zenith_running(path: &Path) -> bool {
+async fn is_elmodeer_running(path: &Path) -> bool {
     name_of_process_for_pidfile(path)
         .await
-        .map_or(false, |name| name == "zenith")
+        .map_or(false, |name| name == "elmodeer")
 }
 
 async fn name_of_process_for_pidfile(path: &Path) -> Option<String> {
