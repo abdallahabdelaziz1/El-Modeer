@@ -60,10 +60,5 @@ In ElModeer 'h' key will show this help:
 
 <img src="./assets/help.png" alt="Running ElModeer on Linux">
 
-## Built using these great crates
 
-- [tui-rs](https://github.com/fdehau/tui-rs)
-- [sysinfo](https://github.com/GuillaumeGomez/sysinfo)
-- [heim](https://github.com/heim-rs/heim)
-- [gumdrop](https://github.com/murarth/gumdrop)
-- [libc](https://github.com/rust-lang/libc)
+This process manager extends builds upon the Zenith process manager, so great thanks to them!
