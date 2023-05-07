@@ -61,7 +61,7 @@ Use npm to install yarn
 ### Rust:
 You need rust for the GUI as well. Refer to CLI to install Rust.
 
-To build the GUI component
+### To build the GUI component
 ```
 cd El-Modeer/tree/Modeer
 yarn tauri build
