@@ -58,7 +58,7 @@ Then use it to sintall npm for this project, the version is 9.5.0
 Use npm to install yarn
 ```npm install --global yarn```
 
-### Rust:
+#### Rust:
 You need rust for the GUI as well. Refer to CLI to install Rust.
 
 ### To build the GUI component
