@@ -867,8 +867,11 @@ impl<'a> TerminalRenderer<'_> {
 
     fn recompute_constraints(&mut self) {
         self.selected_section_index = self.section_geometry.len()-1;
-        for idx in 0..self.section_geometry.len() {
-            self.section_geometry[idx].1 = 100.0 / self.section_geometry.len() as f64;
+        if self.section_geometry.len() == 1 {
+            self.section_geometry[0].1 = 100.0;
+        } else {
+            self.section_geometry[0].1 = 18.0;
+            self.section_geometry[1].1 = 82.0;
         }
         let new_geometry = self.section_geometry.clone();
         let selected = self.section_manager_options.state.selected();
