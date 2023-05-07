@@ -19,9 +19,9 @@
 
 ## Building
 
-### Prerequisites
+### Prerequisites CLI
 
-Building requires rust version >= 1.40 and libclang development packages.
+Building CLI requires rust version >= 1.40 and libclang development packages.
 
 #### Rust:
 Install from your preferred package manager or preferrably use [rustup.rs](https://rustup.rs/)
@@ -36,6 +36,38 @@ ElModeer builds under rustc version >= 1.40.0.
 cd El-Modeer
 cargo build --release
 ```
+
+### Prerequisites GUI
+
+The GUI components builds on following packages:
+ - tauri-apps: ^1.2.3
+ - react: ^18.0.15
+ - vite: ^4.2.1
+ - rust: ^1.40
+ - yarn: ^1.22.19
+ - npm: ^9.5.0
+
+
+#### Npm:
+You can install npm using nvm. First isntall nvm
+```curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.31.3/install.sh | bash```
+Then use it to sintall npm for this project, the version is 9.5.0
+```nvm install <version>```
+
+#### Yarn:
+Use npm to install yarn
+```npm install --global yarn```
+
+### Rust:
+You need rust for the GUI as well. Refer to CLI to install Rust.
+
+To build the GUI component
+```
+cd El-Modeer/tree/Modeer
+yarn tauri build
+```
+
+
 
 ## Running
 To run "El-Modeer" CLI, run the following command from the cloned directory
