@@ -511,6 +511,7 @@ pub fn filter_process_table<'a>(app: &'a CPUTimeApp, filter: &str, show_find_cat
                 || format!("{:}", p.pid).contains(&filter_lc)
                 || p.status.to_string().to_lowercase().contains(&filter_lc)
                 || p.user_name.to_lowercase().contains(&filter_lc)
+                || format!("{:}", p.ppid).contains(&filter_lc)
         })
         .copied()
         .collect();
