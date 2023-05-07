@@ -21,9 +21,6 @@ pub fn render_help(
         ["f    ", "    Freeze refreshing\n"],
         ["i    ", "    Show Section Selection Menu\n"],
         ["o    ", "    Show Column Selection Menu of the Process Table\n"],
-        ["←    ", "    Change the Sorting Column to the Next one\n"],
-        ["→    ", "    Change the Sorting Column to the Previous one\n"],
-        ["`    ", "    Reset charts to current\n"],
     ];
 
     static PROCESS_TABLE_KEYS: &[[&str; 2]] = &[
