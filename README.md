@@ -6,12 +6,15 @@
 
 ## Features
 
-- Quick glances at System information (CPU, Memory, Processes)
-- A filterable process table that includes per process disk usage
-- Sorting process table by any column
-- Change process priority
-- Managing processes with signals (kill, terminate, suspend, continue)
-- Tree view of processes
+- Quick glances at System information (CPU & Memoery).
+- A filterable process table that includes different process information.
+- Sorting process table by any column.
+- Adding or removing any column. 
+- Change process priority.
+- Managing processes (kill, terminate, suspend, continue).
+- Tree view of processes.
+- Freeze the refreshing or change the rate.
+- Detiled view of each process.
 
 
 ## Building
@@ -30,8 +33,35 @@ Install from your preferred package manager or preferrably use [rustup.rs](https
 ElModeer builds under rustc version >= 1.40.0.
 
 ```
-cd el-modeer
+cd El-Modeer
 cargo build --release
+```
+
+## Running
+To run "El-Modeer" CLI, run the following command from the cloned directory
+```
+cargo run
+```
+
+To run "El-Modeer" GUI tree, run the following commands from the cloned directory
+```
+mkdir ~/el-modeer;
+cp ./tree/modeer ~/el-modeer
+cargo run -- -t
+```
+## Command Line
+To get "El-Modeer" command in your path, run the following script from the cloned directory
+```
+bash install.sh
+```
+
+Then, you can use the CLI simply through:
+```
+deer
+```
+And you can use the tree GUI through:
+```
+deer -t
 ```
 
 ## Usage
